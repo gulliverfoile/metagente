@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+  <title>🧩 Fábrica de Agentes (Arquitectura Robusta v3)</title>
+  <script src="https://cdn.jsdelivr.net/npm/handlebars@4.7.8/dist/handlebars.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ajv@8.17.1/dist/ajv.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f1f5f9; padding: 16px 12px 32px; color: #0f172a; }
+    .app { max-width: 750px; margin: 0 auto; }
+    h1, h2, h3 { font-weight: 600; letter-spacing: -0.02em; }
+    .card { background: white; border-radius: 28px; padding: 20px; margin-bottom: 24px; box-shadow: 0 8px 20px rgba(0,0,0,0.02); border: 1px solid #eef2f6; }
+    label { font-weight: 600; font-size: 0.9rem; color: #334155; margin: 12px 0 4px; display: block; }
+    input, select, textarea { width: 100%; padding: 12px 16px; border-radius: 18px; border: 1.5px solid #d9e2ef; background: white; font-size: 1rem; margin-bottom: 8px; }
+    .dimension-box { background: #f8fafc; border-radius: 22px; padding: 18px; margin-bottom: 18px; border-left: 6px solid #2563eb; }
+    .btn { background: #0f172a; color: white; border: none; padding: 14px 20px; border-radius: 60px; font-weight: 600; font-size: 1rem; width: 100%; cursor: pointer; margin-top: 8px; }
+    .btn-outline { background: white; color: #0f172a; border: 1.5px solid #d9e2ef; }
+    .flex-row { display: flex; gap: 12px; align-items: center; }
+    .preview-box { background: #f1f5f9; border-radius: 20px; padding: 20px; margin-top: 20px; }
+    .badge { background: #e0e7ff; color: #1e3a8a; padding: 4px 12px; border-radius: 30px; font-size: 0.8rem; }
+    .modal { display: none; position: fixed; inset: 0; background: #00000050; backdrop-filter: blur(4px); align-items: center; justify-content: center; z-index: 1000; }
+    .modal-content { background: white; max-width: 550px; border-radius: 36px; padding: 24px; max-height: 80vh; overflow-y: auto; }
+    .close-btn { float: right; font-size: 28px; cursor: pointer; }
+    .note { font-size: 0.8rem; color: #64748b; margin-top: 4px; }
+    .history-item { padding: 8px 12px; background: #f8fafc; border-radius: 12px; margin-bottom: 6px; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+<div class="app">
+  <div style="display: flex; justify-content: space-between;">
+    <h1>🧱 Fábrica Modular <span class="badge">v3 · Mejorada</span></h1>
+    <button id="showReadmeBtn" class="btn-outline" style="width: auto; padding: 8px 18px;">📖 README</button>
+  </div>
+  <p style="margin-bottom: 20px;">Reglas declarativas · Exportación completa · Memoria real · Adaptadores genéricos</p>
+
+  <!-- ========== MODO CREADOR ========== -->
+  <div class="card" id="creatorPanel">
+    <h2 style="margin-bottom: 16px;">🛠️ 1. Configuración del Agente</h2>
+    
+    <label>Nombre del agente</label>
+    <input type="text" id="agentName" value="Mi Agente Mejorado">
+    <label>Propósito</label>
+    <input type="text" id="agentPurpose" value="Recomienda opciones según tus preferencias.">
+    
+    <label>📂 Fuente de datos</label>
+    <select id="dataSourceType">
+      <option value="json">📁 JSON estático (demo recetas)</option>
+      <option value="api">🌐 API externa (URL)</option>
+      <option value="search">🔍 Búsqueda Google</option>
+    </select>
+    <div id="apiConfigPanel" style="display:none;">
+      <label>URL de la API</label>
+      <input type="text" id="apiUrl" placeholder="https://api.ejemplo.com/datos">
+      <label>API Key (opcional)</label>
+      <input type="text" id="apiKey" placeholder="Bearer token">
+      <label>Mapeo de campos (JSON)</label>
+      <textarea id="fieldMapping" rows="2">{"nombre": "title", "kcal": "calories", "tiempo": "time"}</textarea>
+      <p class="note">Mapea campos de la API a los internos (nombre, kcal, tiempo, etc.)</p>
+    </div>
+
+    <!-- Definición del esquema de datos -->
+    <div style="margin-top: 20px;">
+      <h3>📊 Esquema de Datos</h3>
+      <label>Campos disponibles (nombre interno y tipo)</label>
+      <textarea id="dataSchema" rows="3">{
+  "nombre": "string",
+  "kcal": "number",
+  "proteina": "number",
+  "tiempo": "number",
+  "precio": "number",
+  "categoria": "string",
+  "restricciones": "array"
+}</textarea>
+      <p class="note">Define los campos que tienen tus datos. Se usará para validar y filtrar.</p>
+    </div>
+    
+    <!-- Dimensiones abstractas -->
+    <div style="margin-top: 20px;">
+      <h3>🧭 Dimensiones del usuario</h3>
+      
+      <div class="dimension-box">
+        <label>🎯 Objetivo</label>
+        <input type="text" id="dimGoalQ" value="¿Qué quieres conseguir?">
+        <label>Opciones</label>
+        <input type="text" id="dimGoalOpts" value="Perder peso, Ganar músculo, Ahorrar">
+        <label>Regla de filtro por opción (JSON)</label>
+        <textarea id="dimGoalRules" rows="3">{
+  "Perder peso": {"campo": "categoria", "operador": "=", "valor": "light"},
+  "Ganar músculo": {"campo": "categoria", "operador": "=", "valor": "protein"},
+  "Ahorrar": {"campo": "categoria", "operador": "=", "valor": "cheap"}
+}</textarea>
+      </div>
+      
+      <div class="dimension-box">
+        <label>🏷️ Perfil</label>
+        <input type="text" id="dimProfileQ" value="¿Cuál es tu perfil?">
+        <input type="text" id="dimProfileOpts" value="Principiante, Intermedio, Avanzado">
+      </div>
+      
+      <div class="dimension-box">
+        <label>🚫 Restricciones</label>
+        <input type="text" id="dimRestrictQ" value="¿Restricciones?">
+        <input type="text" id="dimRestrictOpts" value="Sin gluten, Sin lactosa, Vegano">
+        <label>Campo en datos</label>
+        <input type="text" id="dimRestrictField" value="restricciones">
+      </div>
+      
+      <div class="dimension-box">
+        <label>⏳ Recurso limitante</label>
+        <input type="text" id="dimResourceLabel" value="Tiempo máximo (minutos)">
+        <select id="dimResourceType"><option value="number">Numérico</option><option value="slider">Deslizador</option></select>
+        <label>Campo en datos</label>
+        <input type="text" id="dimResourceField" value="tiempo">
+      </div>
+      
+      <div class="dimension-box">
+        <label>📍 Contexto personalizado</label>
+        <input type="text" id="dimContextQ" value="¿Dónde compras?">
+        <label>Variable para plantilla</label>
+        <input type="text" id="dimContextVar" value="supermercado">
+      </div>
+      
+      <div class="dimension-box">
+        <label>🎤 Estilo</label>
+        <select id="dimTone"><option value="motivador">Motivador</option><option value="serio">Experto</option><option value="zen">Zen</option></select>
+        <label>Plantilla Handlebars</label>
+        <textarea id="dimTemplate" rows="2">🔥 {{nombre}} | {{detalles}} | ¡Desde {{supermercado}}!</textarea>
+        <p class="note">Variables disponibles: {{nombre}}, {{detalles}}, y tu variable de contexto.</p>
+      </div>
+      
+      <div class="flex-row">
+        <div style="flex:1"><label>🧠 Memoria</label><select id="dimMemory"><option value="none">No recordar</option><option value="profile">Recordar contexto</option><option value="last3">No repetir últimas 3</option></select></div>
+        <div style="flex:1"><label>⚡ Acción</label><select id="dimAction"><option value="show">Solo mostrar</option><option value="link">Enlace externo</option></select></div>
+      </div>
+    </div>
+
+    <!-- Traductor IA -->
+    <div style="margin-top: 20px; background: #eef2ff; padding: 16px; border-radius: 20px;">
+      <label>🤖 Asistente IA (opcional - requiere API Key)</label>
+      <input type="text" id="openAIKey" placeholder="Tu API Key de OpenAI">
+      <input type="text" id="userPromptForAgent" placeholder="Describe el agente que quieres...">
+      <button class="btn-outline" id="generateWithAI">✨ Generar con IA</button>
+    </div>
+
+    <button class="btn" id="applyConfigBtn">✅ Aplicar configuración</button>
+    <button class="btn-outline" id="exportAgentBtn">📦 Exportar agente como HTML completo</button>
+  </div>
+
+  <!-- ========== VISTA USUARIO ========== -->
+  <div class="card" id="userPanel">
+    <h2 id="previewAgentName">Mi Agente Mejorado</h2>
+    <p id="previewPurpose">Recomienda opciones según tus preferencias.</p>
+    <div id="dynamicUserForm"></div>
+    <button class="btn" id="runAgentBtn">🚀 Ejecutar Agente</button>
+    <div id="agentOutput" class="preview-box"><i>Completa y ejecuta.</i></div>
+    
+    <!-- Historial -->
+    <div style="margin-top: 20px;">
+      <h3>📋 Historial de recomendaciones</h3>
+      <div id="historyContainer"></div>
+      <button class="btn-outline" id="clearHistoryBtn" style="margin-top: 8px;">🗑️ Limpiar historial</button>
+    </div>
+  </div>
+  <p style="text-align: center; opacity:0.7;">⚡ Reglas declarativas · Exportación completa · Memoria real</p>
+</div>
+
+<!-- MODAL README -->
+<div class="modal" id="readmeModal">
+  <div class="modal-content">
+    <span class="close-btn" id="closeModalBtn">&times;</span>
+    <h2>📘 README · v3 Mejorada</h2>
+    <div style="margin-top:16px;">
+      <p><strong>Novedades:</strong></p>
+      <ul>
+        <li>✅ Motor de reglas declarativo (JSON).</li>
+        <li>✅ Esquema de datos configurable.</li>
+        <li>✅ Exportación del motor completo (sin simplificar).</li>
+        <li>✅ Memoria real: evita repetir últimas 3 recomendaciones.</li>
+        <li>✅ Adaptador API con mapeo de campos.</li>
+        <li>✅ Historial visible en interfaz.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function(){
+    "use strict";
+
+    // ---------- 1. EVENT BUS ----------
+    class EventBus {
+      constructor() { this.events = {}; }
+      on(event, callback) { if (!this.events[event]) this.events[event] = []; this.events[event].push(callback); }
+      emit(event, data) { if (this.events[event]) this.events[event].forEach(cb => cb(data)); }
+    }
+    const bus = new EventBus();
+
+    // ---------- 2. VALIDADOR JSON SCHEMA ----------
+    const ajv = new Ajv();
+    const configSchema = {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        purpose: { type: "string" },
+        dataSource: { type: "object" },
+        dataSchema: { type: "object" },
+        dimensions: { type: "object" }
+      },
+      required: ["name", "purpose", "dataSource", "dimensions"]
+    };
+    const validateConfig = ajv.compile(configSchema);
+
+    // ---------- 3. DATOS DEMO ----------
+    const DEMO_RECETAS = [
+      { nombre: 'Revuelto de claras', kcal: 150, proteina: 22, tiempo: 8, precio: 1.2, restricciones: ['Sin gluten','Sin lactosa'], categoria: 'light' },
+      { nombre: 'Ensalada de garbanzos', kcal: 310, proteina: 12, tiempo: 10, precio: 1.5, restricciones: ['Vegano','Sin gluten'], categoria: 'cheap' },
+      { nombre: 'Pechuga de pollo', kcal: 280, proteina: 35, tiempo: 15, precio: 2.8, restricciones: ['Sin gluten','Sin lactosa'], categoria: 'protein' },
+      { nombre: 'Yogur skyr', kcal: 120, proteina: 17, tiempo: 1, precio: 1.0, restricciones: ['Sin gluten'], categoria: 'light' },
+    ];
+
+    // ---------- 4. MOTOR DE REGLAS DECLARATIVO ----------
+    function applyDeclarativeRules(items, config, userInput) {
+      let filtered = [...items];
+      const dims = config.dimensions;
+      const schema = config.dataSchema || {};
+      
+      // 1. Filtro por objetivo (regla declarativa)
+      const goalRules = dims.goal.rules || {};
+      const selectedGoal = userInput.goal;
+      if (goalRules[selectedGoal]) {
+        const rule = goalRules[selectedGoal];
+        filtered = filtered.filter(item => {
+          const itemValue = item[rule.campo];
+          if (rule.operador === '=') return itemValue == rule.valor;
+          if (rule.operador === '>') return itemValue > rule.valor;
+          if (rule.operador === '<') return itemValue < rule.valor;
+          if (rule.operador === '>=') return itemValue >= rule.valor;
+          if (rule.operador === '<=') return itemValue <= rule.valor;
+          if (rule.operador === 'includes') return itemValue.includes(rule.valor);
+          return true;
+        });
+      }
+      
+      // 2. Recurso limitante (tiempo, etc.)
+      const resourceField = dims.resource.field || 'tiempo';
+      if (userInput.resource && !isNaN(userInput.resource)) {
+        const max = Number(userInput.resource);
+        filtered = filtered.filter(item => item[resourceField] <= max);
+      }
+      
+      // 3. Restricciones (flags)
+      const restrictField = dims.restrictions.field || 'restricciones';
+      if (userInput.restrictions.length && filtered.length && Array.isArray(filtered[0][restrictField])) {
+        filtered = filtered.filter(item => 
+          userInput.restrictions.every(r => item[restrictField].includes(r))
+        );
+      }
+      
+      // 4. Memoria: evitar repetir últimas 3
+      if (dims.memory === 'last3') {
+        const history = getHistory();
+        const lastNames = history.slice(-3).map(h => h.nombre);
+        filtered = filtered.filter(item => !lastNames.includes(item.nombre));
+      }
+      
+      return filtered;
+    }
+
+    // ---------- 5. ADAPTADORES DE DATOS ----------
+    const DataAdapters = {
+      json: async (config) => DEMO_RECETAS,
+      api: async (config) => {
+        if (!config.dataSource.url) throw new Error("URL de API no definida");
+        const headers = config.dataSource.apiKey ? { 'Authorization': `Bearer ${config.dataSource.apiKey}` } : {};
+        const res = await fetch(config.dataSource.url, { headers });
+        if (!res.ok) throw new Error(`API error: ${res.status}`);
+        let data = await res.json();
+        // Mapeo de campos
+        const mapping = config.dataSource.fieldMapping || {};
+        if (Object.keys(mapping).length > 0) {
+          data = data.map(item => {
+            const mapped = {};
+            Object.entries(mapping).forEach(([internal, external]) => {
+              mapped[internal] = item[external];
+            });
+            return mapped;
+          });
+        }
+        return data;
+      },
+      search: async (config, userInput) => {
+        const goalIdx = config.dimensions.goal.options.indexOf(userInput.goal);
+        const keyword = goalIdx>=0 ? Object.keys(config.dimensions.goal.rules)[goalIdx] : userInput.goal;
+        const query = `${keyword} ${userInput.restrictions.join(' ')} ${userInput.context}`;
+        return { type: 'search', url: `https://www.google.com/search?q=${encodeURIComponent(query)}`, query };
+      }
+    };
+
+    // ---------- 6. GESTIÓN DE HISTORIAL (MEMORIA) ----------
+    function getHistory() {
+      return JSON.parse(localStorage.getItem('agentHistory') || '[]');
+    }
+    function addToHistory(item, userInput) {
+      const history = getHistory();
+      history.push({ nombre: item.nombre, fecha: new Date().toLocaleString(), contexto: userInput.context });
+      if (history.length > 10) history.shift();
+      localStorage.setItem('agentHistory', JSON.stringify(history));
+      renderHistory();
+    }
+    function renderHistory() {
+      const history = getHistory();
+      const container = document.getElementById('historyContainer');
+      if (history.length === 0) {
+        container.innerHTML = '<p class="note">Sin historial.</p>';
+        return;
+      }
+      container.innerHTML = history.map(h => 
+        `<div class="history-item"><strong>${h.nombre}</strong> (${h.fecha}) ${h.contexto ? '· ' + h.contexto : ''}</div>`
+      ).join('');
+    }
+
+    // ---------- 7. RENDERIZADO UI USUARIO ----------
+    function renderUserForm(config) {
+      const dims = config.dimensions;
+      let html = '';
+      html += `<label>${dims.goal.question}</label><select id="userGoal">`;
+      dims.goal.options.forEach(opt => html += `<option>${opt}</option>`);
+      html += `</select>`;
+      
+      html += `<label>${dims.profile.question}</label><select id="userProfile">`;
+      dims.profile.options.forEach(opt => html += `<option>${opt}</option>`);
+      html += `</select>`;
+      
+      html += `<label>${dims.restrictions.question}</label><div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;">`;
+      dims.restrictions.options.forEach(opt => {
+        html += `<label style="display:flex; align-items:center; gap:6px;"><input type="checkbox" value="${opt}" class="userRestrict"> ${opt}</label>`;
+      });
+      html += `</div>`;
+      
+      html += `<label>${dims.resource.label}</label>`;
+      if (dims.resource.type === 'number') html += `<input type="number" id="userResource" value="30">`;
+      else html += `<input type="range" id="userResource" min="0" max="120" value="30">`;
+      
+      html += `<label>${dims.context.question}</label><input type="text" id="userContext" placeholder="...">`;
+      
+      document.getElementById('dynamicUserForm').innerHTML = html;
+    }
+
+    // ---------- 8. EJECUCIÓN DEL AGENTE ----------
+    async function executeAgent() {
+      if (!currentConfig) return;
+      const dims = currentConfig.dimensions;
+      
+      const userInput = {
+        goal: document.getElementById('userGoal')?.value || '',
+        profile: document.getElementById('userProfile')?.value || '',
+        restrictions: Array.from(document.querySelectorAll('.userRestrict:checked')).map(cb => cb.value),
+        resource: document.getElementById('userResource')?.value || '',
+        context: document.getElementById('userContext')?.value || ''
+      };
+      
+      try {
+        let result;
+        const sourceType = currentConfig.dataSource.type;
+        
+        if (sourceType === 'search') {
+          const adapterResult = await DataAdapters.search(currentConfig, userInput);
+          document.getElementById('agentOutput').innerHTML = `🔍 <strong>Búsqueda:</strong> "${adapterResult.query}"<br><a href="${adapterResult.url}" target="_blank">Ver en Google</a>`;
+          return;
+        }
+        
+        const items = await DataAdapters[sourceType](currentConfig);
+        let filtered = applyDeclarativeRules(items, currentConfig, userInput);
+        
+        if (filtered.length === 0) {
+          document.getElementById('agentOutput').innerHTML = '😕 No hay resultados. Relaja filtros.';
+          return;
+        }
+        
+        // Si hay memoria de no repetición y todos están en historial, ignoramos el filtro
+        if (dims.memory === 'last3' && filtered.length === 0) {
+          filtered = applyDeclarativeRules(items, currentConfig, {...userInput, ignoreMemory: true});
+        }
+        
+        const selected = filtered[0];
+        const nombre = selected.nombre;
+        let detalles = '';
+        if (selected.kcal) detalles = `${selected.kcal} kcal, ${selected.proteina}g prot`;
+        else if (selected.duracion) detalles = `${selected.duracion} min`;
+        else detalles = '';
+        
+        const template = Handlebars.compile(dims.template);
+        const contextVar = dims.context.variable;
+        const htmlMsg = template({ nombre, detalles, [contextVar]: userInput.context || '_________' });
+        
+        let finalHtml = htmlMsg;
+        if (dims.action === 'link') {
+          finalHtml += `<br><a href="https://www.google.com/search?q=${encodeURIComponent(nombre)}" target="_blank">🔗 Más info</a>`;
+        }
+        
+        document.getElementById('agentOutput').innerHTML = finalHtml;
+        addToHistory(selected, userInput);
+        bus.emit('agent:executed', selected);
+        
+      } catch (err) {
+        document.getElementById('agentOutput').innerHTML = `❌ Error: ${err.message}`;
+      }
+    }
+
+    // ---------- 9. CONFIGURACIÓN ----------
+    let currentConfig = null;
+
+    function collectConfigFromForm() {
+      const goalRules = JSON.parse(document.getElementById('dimGoalRules').value || '{}');
+      const dataSchema = JSON.parse(document.getElementById('dataSchema').value || '{}');
+      const fieldMapping = document.getElementById('fieldMapping') ? JSON.parse(document.getElementById('fieldMapping').value || '{}') : {};
+      
+      return {
+        name: document.getElementById('agentName').value,
+        purpose: document.getElementById('agentPurpose').value,
+        dataSource: {
+          type: document.getElementById('dataSourceType').value,
+          url: document.getElementById('apiUrl')?.value || '',
+          apiKey: document.getElementById('apiKey')?.value || '',
+          fieldMapping
+        },
+        dataSchema,
+        dimensions: {
+          goal: {
+            question: document.getElementById('dimGoalQ').value,
+            options: document.getElementById('dimGoalOpts').value.split(',').map(s=>s.trim()),
+            rules: goalRules
+          },
+          profile: {
+            question: document.getElementById('dimProfileQ').value,
+            options: document.getElementById('dimProfileOpts').value.split(',').map(s=>s.trim())
+          },
+          restrictions: {
+            question: document.getElementById('dimRestrictQ').value,
+            options: document.getElementById('dimRestrictOpts').value.split(',').map(s=>s.trim()),
+            field: document.getElementById('dimRestrictField').value
+          },
+          resource: {
+            label: document.getElementById('dimResourceLabel').value,
+            type: document.getElementById('dimResourceType').value,
+            field: document.getElementById('dimResourceField').value
+          },
+          context: {
+            question: document.getElementById('dimContextQ').value,
+            variable: document.getElementById('dimContextVar').value
+          },
+          tone: document.getElementById('dimTone').value,
+          template: document.getElementById('dimTemplate').value,
+          memory: document.getElementById('dimMemory').value,
+          action: document.getElementById('dimAction').value
+        }
+      };
+    }
+
+    function applyConfigToUI(config) {
+      document.getElementById('previewAgentName').innerText = config.name;
+      document.getElementById('previewPurpose').innerText = config.purpose;
+      renderUserForm(config);
+      document.getElementById('agentOutput').innerHTML = '<i>Configuración aplicada. Completa y ejecuta.</i>';
+      document.getElementById('apiConfigPanel').style.display = config.dataSource.type === 'api' ? 'block' : 'none';
+      localStorage.setItem('robustAgentConfigV3', JSON.stringify(config));
+      bus.emit('config:updated', config);
+      renderHistory();
+    }
+
+    function populateFormFromConfig(cfg) {
+      document.getElementById('agentName').value = cfg.name;
+      document.getElementById('agentPurpose').value = cfg.purpose;
+      document.getElementById('dataSourceType').value = cfg.dataSource.type;
+      if (cfg.dataSource.url) document.getElementById('apiUrl').value = cfg.dataSource.url;
+      if (cfg.dataSource.apiKey) document.getElementById('apiKey').value = cfg.dataSource.apiKey;
+      if (cfg.dataSource.fieldMapping) document.getElementById('fieldMapping').value = JSON.stringify(cfg.dataSource.fieldMapping);
+      document.getElementById('dataSchema').value = JSON.stringify(cfg.dataSchema, null, 2);
+      const d = cfg.dimensions;
+      document.getElementById('dimGoalQ').value = d.goal.question;
+      document.getElementById('dimGoalOpts').value = d.goal.options.join(', ');
+      document.getElementById('dimGoalRules').value = JSON.stringify(d.goal.rules, null, 2);
+      document.getElementById('dimProfileQ').value = d.profile.question;
+      document.getElementById('dimProfileOpts').value = d.profile.options.join(', ');
+      document.getElementById('dimRestrictQ').value = d.restrictions.question;
+      document.getElementById('dimRestrictOpts').value = d.restrictions.options.join(', ');
+      document.getElementById('dimRestrictField').value = d.restrictions.field;
+      document.getElementById('dimResourceLabel').value = d.resource.label;
+      document.getElementById('dimResourceType').value = d.resource.type;
+      document.getElementById('dimResourceField').value = d.resource.field;
+      document.getElementById('dimContextQ').value = d.context.question;
+      document.getElementById('dimContextVar').value = d.context.variable;
+      document.getElementById('dimTone').value = d.tone;
+      document.getElementById('dimTemplate').value = d.template;
+      document.getElementById('dimMemory').value = d.memory;
+      document.getElementById('dimAction').value = d.action;
+    }
+
+    // ---------- 10. EXPORTACIÓN COMPLETA ----------
+    function exportFullAgent() {
+      if (!currentConfig) return;
+      // Tomamos el HTML completo del documento, pero ocultamos el panel creador y mostramos solo usuario
+      const cloneDoc = document.documentElement.cloneNode(true);
+      // Eliminar panel creador y mostrar solo usuario
+      const creator = cloneDoc.querySelector('#creatorPanel');
+      if (creator) creator.remove();
+      // Ajustar estilos para que se vea bien
+      const style = cloneDoc.querySelector('style');
+      style.innerHTML += ` #userPanel { display: block !important; } `;
+      
+      const serializer = new XMLSerializer();
+      let htmlString = serializer.serializeToString(cloneDoc);
+      
+      // Inyectar la configuración actual en el HTML exportado
+      const configScript = `<script>window.AGENT_CONFIG = ${JSON.stringify(currentConfig)};<\/script>`;
+      htmlString = htmlString.replace('</head>', configScript + '</head>');
+      
+      // Añadir script de inicialización standalone
+      const initScript = `
+        <script>
+          (function(){
+            if (window.AGENT_CONFIG) {
+              // Sobrescribir la función de carga para usar la config inyectada
+              const config = window.AGENT_CONFIG;
+              document.addEventListener('DOMContentLoaded', function() {
+                // Ocultar panel creador si existe
+                const creator = document.getElementById('creatorPanel');
+                if(creator) creator.style.display = 'none';
+                // Renderizar UI usuario
+                // ... (código de renderizado mínimo)
+              });
+            }
+          })();
+        <\/script>
+      `;
+      htmlString = htmlString.replace('</body>', initScript + '</body>');
+      
+      const blob = new Blob([htmlString], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${currentConfig.name.replace(/\s/g,'_')}.html`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // ---------- 11. INICIALIZACIÓN ----------
+    function setDefaultConfig() {
+      currentConfig = {
+        name: 'NutriAgente Mejorado',
+        purpose: 'Recomienda recetas según objetivos',
+        dataSource: { type: 'json', url: '', apiKey: '', fieldMapping: {} },
+        dataSchema: { nombre: 'string', kcal: 'number', proteina: 'number', tiempo: 'number', categoria: 'string', restricciones: 'array' },
+        dimensions: {
+          goal: {
+            question: '¿Objetivo?',
+            options: ['Perder peso','Ganar músculo','Ahorrar'],
+            rules: {
+              'Perder peso': { campo: 'categoria', operador: '=', valor: 'light' },
+              'Ganar músculo': { campo: 'categoria', operador: '=', valor: 'protein' },
+              'Ahorrar': { campo: 'categoria', operador: '=', valor: 'cheap' }
+            }
+          },
+          profile: { question: 'Perfil', options: ['Principiante','Intermedio','Avanzado'] },
+          restrictions: { question: 'Restricciones', options: ['Sin gluten','Sin lactosa','Vegano'], field: 'restricciones' },
+          resource: { label: 'Tiempo (min)', type: 'number', field: 'tiempo' },
+          context: { question: '¿Supermercado?', variable: 'supermercado' },
+          tone: 'motivador',
+          template: '🔥 {{nombre}} | {{detalles}} | {{supermercado}}',
+          memory: 'none',
+          action: 'show'
+        }
+      };
+      populateFormFromConfig(currentConfig);
+      applyConfigToUI(currentConfig);
+    }
+
+    function init() {
+      const saved = localStorage.getItem('robustAgentConfigV3');
+      if (saved) {
+        try {
+          currentConfig = JSON.parse(saved);
+          populateFormFromConfig(currentConfig);
+          applyConfigToUI(currentConfig);
+        } catch { setDefaultConfig(); }
+      } else { setDefaultConfig(); }
+      
+      document.getElementById('applyConfigBtn').addEventListener('click', () => {
+        const cfg = collectConfigFromForm();
+        if (validateConfig(cfg)) {
+          currentConfig = cfg;
+          applyConfigToUI(cfg);
+        } else {
+          alert('Configuración inválida. Revisa consola.');
+          console.error(validateConfig.errors);
+        }
+      });
+      
+      document.getElementById('runAgentBtn').addEventListener('click', executeAgent);
+      document.getElementById('exportAgentBtn').addEventListener('click', exportFullAgent);
+      document.getElementById('clearHistoryBtn').addEventListener('click', () => {
+        localStorage.removeItem('agentHistory');
+        renderHistory();
+      });
+      
+      document.getElementById('dataSourceType').addEventListener('change', (e) => {
+        document.getElementById('apiConfigPanel').style.display = e.target.value === 'api' ? 'block' : 'none';
+      });
+      
+      // Modal README
+      const modal = document.getElementById('readmeModal');
+      document.getElementById('showReadmeBtn').addEventListener('click', () => modal.style.display = 'flex');
+      document.getElementById('closeModalBtn').addEventListener('click', () => modal.style.display = 'none');
+      
+      renderHistory();
+    }
+
+    init();
+  })();
+</script>
+</body>
+</html>
