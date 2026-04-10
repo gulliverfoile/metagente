@@ -1,0 +1,160 @@
+markdown
+# 🧩 Fábrica Abstracta de Agentes (Humo Desenmascarado)
+
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+[![HTML5](https://img.shields.io/badge/HTML5-E34F26?logo=html5&logoColor=white)](#)
+[![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?logo=javascript&logoColor=black)](#)
+[![Sin Dependencias](https://img.shields.io/badge/Dependencias-0%20(vanilla)-green)](#)
+
+**Demuestra que el 80% de los "agentes IA" modernos son solo un JSON de configuración, un `filter()` y una plantilla de texto. Sin magia, sin backend, sin suscripción.**
+
+Crea tu propio agente (recomendador de recetas, generador de excusas, asesor de viajes, analista de ventas...) en segundos respondiendo preguntas abstractas.
+
+---
+
+## 📖 Filosofía
+
+> *"Un agente es un prompt bien ejecutado, que venden que es la leche pero no dejan de ser loops y eso se puede hacer con prompts bien ejecutados, que son humo."*
+
+Este proyecto nació de una conversación sobre la verdadera naturaleza de los "Agentes IA" que inundan el marketing tecnológico. Queríamos demostrar que con un simple formulario de configuración, un motor de reglas declarativas y una plantilla, se puede replicar la funcionalidad básica de muchos agentes comerciales.
+
+**No es magia, es abstracción.**
+
+---
+
+## ✨ Características
+
+- **100% configurable**: Todas las dimensiones (objetivo, perfil, restricciones, etc.) son editables en tiempo real.
+- **Motor de reglas declarativas**: Define filtros con JSON (`{ "campo": "kcal", "operador": "<", "valor": 400 }`).
+- **Adaptadores de datos intercambiables**: JSON local, API externa (con mapeo de campos), o búsqueda en Google (parche low-cost).
+- **Memoria real**: Historial en `localStorage` y opción de no repetir las últimas N recomendaciones.
+- **Validación robusta**: JSON Schema + Ajv garantiza que la configuración sea correcta.
+- **Exportación a HTML autónomo**: Genera un archivo `.html` con el agente completo listo para usar (sin el panel de configuración).
+- **Traductor IA opcional**: Describe el agente en lenguaje natural y una IA (OpenAI) genera la configuración por ti (requiere tu propia API Key).
+- **Sin backend, sin costes**: Funciona 100% en el navegador. Solo necesitas abrir el archivo.
+
+---
+
+## 🚀 Cómo usarlo
+
+### Opción 1: Probar online (GitHub Pages)
+*Próximamente: enlace a la demo desplegada.*
+
+### Opción 2: Ejecutar en local
+1. Clona este repositorio:
+   ```bash
+   git clone https://github.com/tu-usuario/fabrica-abstracta-agentes.git
+Abre el archivo index.html en tu navegador favorito.
+
+¡A crear agentes!
+
+Modo Creador (parte superior)
+Modifica el nombre, propósito y fuente de datos.
+
+Cambia las preguntas, opciones y reglas declarativas de cada dimensión.
+
+Pulsa "Aplicar configuración" para ver los cambios en la vista previa.
+
+Modo Usuario (parte inferior)
+Rellena el formulario generado con tus preferencias.
+
+Pulsa "Ejecutar Agente".
+
+Observa el resultado y el historial de recomendaciones.
+
+Ejemplos rápidos
+Recetas: Objetivo "Perder peso", restricción "Sin lactosa", tiempo 15 min.
+
+Excusas: Modifica el JSON para que filtre por "credibilidad" y "tiempo de redacción".
+
+Búsqueda Google: Configura cualquier dimensión y el agente abrirá una pestaña con los resultados.
+
+Exportar agente
+Una vez configurado a tu gusto, pulsa "Exportar agente como HTML completo".
+
+Obtendrás un archivo autocontenido que solo muestra la interfaz de usuario, listo para compartir.
+
+Usar el Traductor IA (opcional)
+Introduce tu API Key de OpenAI (no se almacena en ningún servidor).
+
+Describe el agente que quieres (ej: "Quiero un agente que recomiende películas según mi estado de ánimo y la duración máxima").
+
+La IA rellenará el formulario automáticamente (requiere conexión a internet).
+
+📁 Estructura del proyecto
+text
+.
+├── index.html          # Único archivo necesario. Contiene HTML, CSS y JS.
+├── LICENSE             # Texto completo de la AGPLv3.
+└── README.md           # Este archivo.
+No hay dependencias externas (Handlebars y Ajv se cargan desde CDN, pero podrían empaquetarse).
+
+🛠️ Tecnologías
+HTML5 semántico.
+
+CSS3 con Flexbox y diseño responsive.
+
+JavaScript (ES6) puro:
+
+Arquitectura basada en EventBus (Pub/Sub).
+
+Motor de reglas declarativo.
+
+Adaptadores de fuente de datos intercambiables.
+
+Validación con JSON Schema (Ajv).
+
+Plantillas Handlebars.
+
+localStorage para persistencia local.
+
+⚖️ Licencia AGPLv3
+Este proyecto está licenciado bajo la GNU Affero General Public License v3.0 (AGPLv3).
+
+¿Qué significa esto?
+La AGPLv3 es una licencia de software libre con copyleft fuerte, similar a la GPLv3 pero con una cláusula adicional para servicios de red (SaaS).
+
+✅ Libertad de uso, estudio, modificación y distribución.
+
+✅ Obligación de publicar el código fuente de cualquier versión modificada que se distribuya o se utilice para prestar un servicio a través de una red (cláusula 13).
+
+✅ Protección contra la "tivoización" y patentes.
+
+En la práctica: Si modificas este proyecto y lo usas en un servidor para ofrecer un servicio (por ejemplo, una web donde la gente crea agentes), estás obligado a publicar el código fuente completo de tu versión modificada bajo la misma licencia AGPLv3.
+
+El texto completo de la licencia está disponible en el archivo LICENSE y en https://www.gnu.org/licenses/agpl-3.0.html.
+
+¿Por qué AGPLv3?
+Porque queremos que cualquier mejora o derivado de esta herramienta permanezca libre y accesible para todos, incluso si se utiliza en la nube. Creemos que el conocimiento para desenmascarar el "humo tecnológico" debe ser de dominio público.
+
+🔮 Posibles mejoras (Roadmap)
+Si quieres expandir el proyecto (y mantenerlo libre), aquí tienes algunas ideas:
+
+Separar en módulos ES6 y usar un bundler (Vite, Webpack).
+
+Añadir más operadores en las reglas declarativas (contains, startsWith).
+
+Implementar un backend mínimo para compartir agentes vía URL.
+
+Convertir en PWA para funcionar offline como app instalable.
+
+Añadir tests unitarios (Jest/Vitest).
+
+🙌 Créditos y agradecimientos
+Idea original y desarrollo fruto de una conversación entre [tu nombre o alias] y DeepSeek, con el noble objetivo de desenmascarar el hype de los agentes IA.
+
+"Programar es curioso y sorprendentemente fácil."
+
+Si te gusta el proyecto, ¡dale una estrella ⭐ y compártelo! Y recuerda: el emperador de los agentes IA va desnudo. 😉
+
+"La simplicidad es la máxima sofisticación" – Leonardo da Vinci
+
+text
+
+### 📄 Archivo `LICENSE` (AGPLv3)
+
+Crea un archivo `LICENSE` en la raíz del repositorio con el texto completo de la licencia. Puedes copiarlo de [https://www.gnu.org/licenses/agpl-3.0.txt](https://www.gnu.org/licenses/agpl-3.0.txt).
+
+---
+
+¡Ya tienes todo listo para subir a GitHub! 😄
