@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+  <title>🧩 Generador Abstracto de Agentes (Full Config)</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #f1f5f9;
+      padding: 16px 12px 32px;
+      color: #0f172a;
+    }
+    .app {
+      max-width: 700px;
+      margin: 0 auto;
+    }
+    h1, h2 { font-weight: 650; letter-spacing: -0.02em; }
+    h1 { font-size: 2rem; display: flex; align-items: center; gap: 12px; }
+    .badge {
+      background: #e0e7ff;
+      color: #1e3a8a;
+      padding: 4px 12px;
+      border-radius: 30px;
+      font-size: 0.8rem;
+    }
+    .card {
+      background: white;
+      border-radius: 28px;
+      padding: 20px;
+      margin-bottom: 24px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.02);
+      border: 1px solid #eef2f6;
+    }
+    label {
+      font-weight: 600;
+      font-size: 0.9rem;
+      color: #334155;
+      margin: 12px 0 4px;
+      display: block;
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 12px 16px;
+      border-radius: 18px;
+      border: 1.5px solid #d9e2ef;
+      background: white;
+      font-size: 1rem;
+      margin-bottom: 8px;
+    }
+    .dimension-box {
+      background: #f8fafc;
+      border-radius: 22px;
+      padding: 18px;
+      margin-bottom: 18px;
+      border-left: 6px solid #2563eb;
+    }
+    .btn {
+      background: #0f172a;
+      color: white;
+      border: none;
+      padding: 14px 20px;
+      border-radius: 60px;
+      font-weight: 600;
+      font-size: 1rem;
+      width: 100%;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+    .btn-outline {
+      background: white;
+      color: #0f172a;
+      border: 1.5px solid #d9e2ef;
+    }
+    .flex-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .preview-box {
+      background: #f1f5f9;
+      border-radius: 20px;
+      padding: 20px;
+      margin-top: 20px;
+    }
+    .readme-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: #00000050;
+      backdrop-filter: blur(4px);
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .modal-content {
+      background: white;
+      max-width: 550px;
+      border-radius: 36px;
+      padding: 24px;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    .close-btn {
+      float: right;
+      font-size: 28px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <div style="display: flex; justify-content: space-between;">
+    <h1>🧠 Fábrica de Agentes <span class="badge">Full Config</span></h1>
+    <button id="showReadmeBtn" class="btn-outline" style="width: auto; padding: 8px 18px;">📖 README</button>
+  </div>
+  <p style="margin-bottom: 20px;">Define todas las preguntas, opciones y reglas. Sin límites.</p>
+
+  <!-- SECCIÓN IDENTIDAD -->
+  <div class="card">
+    <h2 style="margin-bottom: 12px;">1. Identidad del Agente</h2>
+    <label>Nombre del agente</label>
+    <input type="text" id="agentName" value="Mi Agente Personalizado">
+    <label>Propósito (una frase)</label>
+    <input type="text" id="agentPurpose" value="Recomienda opciones según tus preferencias.">
+    <label>Fuente de datos</label>
+    <select id="dataSource">
+      <option value="demo_recetas">🍽️ Demo: Recetas (datos fijos)</option>
+      <option value="demo_excusas">📅 Demo: Excusas laborales</option>
+      <option value="demo_peliculas">🎬 Demo: Películas</option>
+      <option value="busqueda">🔍 Búsqueda en Google (sin datos propios)</option>
+    </select>
+  </div>
+
+  <!-- DIMENSIONES EDITABLES (LAS 7 PRINCIPALES) -->
+  <div class="card">
+    <h2 style="margin-bottom: 16px;">2. Configuración de Dimensiones</h2>
+    
+    <!-- DIMENSIÓN OBJETIVO -->
+    <div class="dimension-box">
+      <label>🎯 Pregunta para el OBJETIVO</label>
+      <input type="text" id="dimGoalQ" value="¿Qué quieres conseguir?">
+      <label>Opciones (separadas por coma)</label>
+      <input type="text" id="dimGoalOpts" value="Perder peso, Ganar músculo, Ahorrar">
+      <label>Palabras clave / filtro (mismo orden)</label>
+      <input type="text" id="dimGoalKeys" value="light, protein, cheap">
+      <p class="note" style="font-size:0.8rem;">Para búsqueda se usarán estas palabras. Para datos demo, se filtrará por categoría.</p>
+    </div>
+
+    <!-- DIMENSIÓN PERFIL -->
+    <div class="dimension-box">
+      <label>🏷️ Pregunta para el PERFIL</label>
+      <input type="text" id="dimProfileQ" value="¿Cuál es tu perfil?">
+      <label>Opciones</label>
+      <input type="text" id="dimProfileOpts" value="Principiante, Intermedio, Avanzado">
+    </div>
+
+    <!-- DIMENSIÓN RESTRICCIONES -->
+    <div class="dimension-box">
+      <label>🚫 Pregunta para RESTRICCIONES</label>
+      <input type="text" id="dimRestrictQ" value="¿Tienes alguna restricción?">
+      <label>Opciones (checkboxes)</label>
+      <input type="text" id="dimRestrictOpts" value="Sin gluten, Sin lactosa, Vegano">
+    </div>
+
+    <!-- DIMENSIÓN RECURSO LIMITANTE -->
+    <div class="dimension-box">
+      <label>⏳ RECURSO LIMITANTE (nombre)</label>
+      <input type="text" id="dimResourceLabel" value="Tiempo máximo (minutos)">
+      <label>Tipo de control</label>
+      <select id="dimResourceType">
+        <option value="number">Numérico</option>
+        <option value="slider">Deslizador</option>
+      </select>
+    </div>
+
+    <!-- DIMENSIÓN CONTEXTO VARIABLE -->
+    <div class="dimension-box">
+      <label>📍 CONTEXTO PERSONALIZADO (pregunta extra)</label>
+      <input type="text" id="dimContextQ" value="¿En qué supermercado compras?">
+      <label>Variable para usar en mensaje (ej: {ciudad})</label>
+      <input type="text" id="dimContextVar" value="supermercado">
+    </div>
+
+    <!-- DIMENSIÓN ESTILO Y PLANTILLA -->
+    <div class="dimension-box">
+      <label>🎤 ESTILO DE COMUNICACIÓN</label>
+      <select id="dimTone">
+        <option value="motivador">Motivador / Sargento</option>
+        <option value="serio">Experto serio</option>
+        <option value="zen">Zen / Holístico</option>
+      </select>
+      <label>Plantilla de respuesta (usa {nombre}, {detalles}, y tu variable de contexto)</label>
+      <textarea id="dimTemplate" rows="2">🔥 {nombre} | {detalles} | ¡A por ello, desde {supermercado}!</textarea>
+    </div>
+
+    <!-- MEMORIA Y ACCIONES -->
+    <div class="flex-row" style="gap: 16px;">
+      <div style="flex:1">
+        <label>🧠 Memoria</label>
+        <select id="dimMemory">
+          <option value="none">No recordar</option>
+          <option value="profile">Recordar contexto</option>
+          <option value="last3">No repetir últimas 3</option>
+        </select>
+      </div>
+      <div style="flex:1">
+        <label>⚡ Acción final</label>
+        <select id="dimAction">
+          <option value="show">Solo mostrar</option>
+          <option value="link">Añadir enlace externo</option>
+        </select>
+      </div>
+    </div>
+
+    <button class="btn" id="applyConfigBtn">✨ Aplicar configuración y actualizar agente</button>
+    <button class="btn-outline" id="resetToDefaultBtn" style="margin-top: 12px;">↺ Restaurar ejemplo Recetas</button>
+  </div>
+
+  <!-- VISTA DEL AGENTE GENERADO (USUARIO) -->
+  <div class="card">
+    <div style="display: flex; justify-content: space-between;">
+      <h2 id="previewAgentName">Mi Agente Personalizado</h2>
+      <span class="badge" id="previewBadge">vista previa</span>
+    </div>
+    <p id="previewPurpose">Recomienda opciones según tus preferencias.</p>
+    
+    <div id="dynamicUserForm"></div>
+    
+    <button class="btn" id="runAgentBtn">🚀 Ejecutar Agente</button>
+    
+    <div id="agentOutput" class="preview-box">
+      <i>Rellena el formulario y pulsa Ejecutar.</i>
+    </div>
+  </div>
+  <p style="text-align: center; opacity: 0.7;">⚙️ 100% configurable · Cada campo del creador modifica el agente</p>
+</div>
+
+<!-- MODAL README -->
+<div class="readme-modal" id="readmeModal">
+  <div class="modal-content">
+    <span class="close-btn" id="closeModalBtn">&times;</span>
+    <h2>📘 README · Generador Abstracto</h2>
+    <div style="margin-top: 16px;">
+      <p><strong>¿Qué es esto?</strong><br>Una herramienta que demuestra que los "agentes IA" son configuración + reglas. Puedes crear tu propio asistente (recetas, excusas, lo que quieras) editando las preguntas y opciones.</p>
+      <p><strong>¿Cómo se usa?</strong></p>
+      <ol>
+        <li><strong>Parte superior (Creador):</strong> Modifica cada dimensión: cambia las preguntas, las opciones, la plantilla de respuesta, etc.</li>
+        <li><strong>Fuente de datos:</strong> Elige entre demos o "Búsqueda en Google" (abre resultados en nueva pestaña).</li>
+        <li>Pulsa <strong>"Aplicar configuración"</strong>. La vista previa se actualiza con tu diseño.</li>
+        <li><strong>Parte inferior (Usuario):</strong> Interactúa con el agente que acabas de crear. Pulsa "Ejecutar".</li>
+        <li>La configuración se guarda en tu navegador.</li>
+      </ol>
+      <p><em>Idea original: demostrar que los agentes son "prompts bien ejecutados con un loop". Sin humo.</em></p>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function(){
+    // ---------- DATASETS DEMO ----------
+    const DEMO_RECETAS = [
+      { nombre: 'Revuelto de claras', kcal: 150, proteina: 22, tiempo: 8, precio: 1.2, restricciones: ['Sin gluten','Sin lactosa'], categoria: 'light' },
+      { nombre: 'Ensalada de garbanzos', kcal: 310, proteina: 12, tiempo: 10, precio: 1.5, restricciones: ['Vegano','Sin gluten'], categoria: 'cheap' },
+      { nombre: 'Pechuga de pollo', kcal: 280, proteina: 35, tiempo: 15, precio: 2.8, restricciones: ['Sin gluten','Sin lactosa'], categoria: 'protein' },
+      { nombre: 'Yogur skyr', kcal: 120, proteina: 17, tiempo: 1, precio: 1.0, restricciones: ['Sin gluten'], categoria: 'light' },
+    ];
+    const DEMO_EXCUSAS = [
+      { nombre: 'Cita médica ineludible', tipo: 'salud', tiempo: 5, credibilidad: 'Alta' },
+      { nombre: 'Problema con el coche', tipo: 'logistica', tiempo: 15, credibilidad: 'Media' },
+      { nombre: 'Familiar enfermo', tipo: 'familiar', tiempo: 5, credibilidad: 'Alta' },
+      { nombre: 'Reunión inesperada', tipo: 'trabajo', tiempo: 10, credibilidad: 'Baja' },
+    ];
+    const DEMO_PELICULAS = [
+      { nombre: 'El Padrino', genero: 'Drama', duracion: 175, plataforma: 'Netflix' },
+      { nombre: 'Toy Story', genero: 'Animación', duracion: 81, plataforma: 'Disney+' },
+      { nombre: 'John Wick', genero: 'Acción', duracion: 101, plataforma: 'HBO' },
+    ];
+
+    // Configuración por defecto
+    const DEFAULT_CONFIG = {
+      name: 'NutriAgente Desenmascarado',
+      purpose: 'Planifica cenas según objetivos y restricciones.',
+      dataSource: 'demo_recetas',
+      dimGoalQ: '¿Cuál es tu objetivo principal?',
+      dimGoalOpts: 'Perder peso, Ganar músculo, Ahorrar',
+      dimGoalKeys: 'light, protein, cheap',
+      dimProfileQ: '¿Cuál es tu perfil?',
+      dimProfileOpts: 'Principiante, Intermedio, Avanzado',
+      dimRestrictQ: '¿Restricciones?',
+      dimRestrictOpts: 'Sin gluten, Sin lactosa, Vegano',
+      dimResourceLabel: 'Tiempo máximo (minutos)',
+      dimResourceType: 'number',
+      dimContextQ: '¿Dónde compras?',
+      dimContextVar: 'supermercado',
+      dimTone: 'motivador',
+      dimTemplate: '🔥 {nombre} | {detalles} | ¡A por ello, desde {supermercado}!',
+      dimMemory: 'none',
+      dimAction: 'show'
+    };
+
+    let currentConfig = { ...DEFAULT_CONFIG };
+
+    // ---------- CARGAR / GUARDAR ----------
+    function loadConfigFromStorage() {
+      const saved = localStorage.getItem('fullAgentConfig');
+      if(saved) {
+        try { currentConfig = JSON.parse(saved); } catch(e) { currentConfig = {...DEFAULT_CONFIG}; }
+      } else {
+        currentConfig = {...DEFAULT_CONFIG};
+      }
+      populateForm();
+    }
+    function saveConfigToStorage() {
+      localStorage.setItem('fullAgentConfig', JSON.stringify(currentConfig));
+    }
+    function populateForm() {
+      document.getElementById('agentName').value = currentConfig.name;
+      document.getElementById('agentPurpose').value = currentConfig.purpose;
+      document.getElementById('dataSource').value = currentConfig.dataSource;
+      document.getElementById('dimGoalQ').value = currentConfig.dimGoalQ;
+      document.getElementById('dimGoalOpts').value = currentConfig.dimGoalOpts;
+      document.getElementById('dimGoalKeys').value = currentConfig.dimGoalKeys;
+      document.getElementById('dimProfileQ').value = currentConfig.dimProfileQ;
+      document.getElementById('dimProfileOpts').value = currentConfig.dimProfileOpts;
+      document.getElementById('dimRestrictQ').value = currentConfig.dimRestrictQ;
+      document.getElementById('dimRestrictOpts').value = currentConfig.dimRestrictOpts;
+      document.getElementById('dimResourceLabel').value = currentConfig.dimResourceLabel;
+      document.getElementById('dimResourceType').value = currentConfig.dimResourceType;
+      document.getElementById('dimContextQ').value = currentConfig.dimContextQ;
+      document.getElementById('dimContextVar').value = currentConfig.dimContextVar;
+      document.getElementById('dimTone').value = currentConfig.dimTone;
+      document.getElementById('dimTemplate').value = currentConfig.dimTemplate;
+      document.getElementById('dimMemory').value = currentConfig.dimMemory;
+      document.getElementById('dimAction').value = currentConfig.dimAction;
+    }
+    function collectConfigFromForm() {
+      currentConfig = {
+        name: document.getElementById('agentName').value,
+        purpose: document.getElementById('agentPurpose').value,
+        dataSource: document.getElementById('dataSource').value,
+        dimGoalQ: document.getElementById('dimGoalQ').value,
+        dimGoalOpts: document.getElementById('dimGoalOpts').value,
+        dimGoalKeys: document.getElementById('dimGoalKeys').value,
+        dimProfileQ: document.getElementById('dimProfileQ').value,
+        dimProfileOpts: document.getElementById('dimProfileOpts').value,
+        dimRestrictQ: document.getElementById('dimRestrictQ').value,
+        dimRestrictOpts: document.getElementById('dimRestrictOpts').value,
+        dimResourceLabel: document.getElementById('dimResourceLabel').value,
+        dimResourceType: document.getElementById('dimResourceType').value,
+        dimContextQ: document.getElementById('dimContextQ').value,
+        dimContextVar: document.getElementById('dimContextVar').value,
+        dimTone: document.getElementById('dimTone').value,
+        dimTemplate: document.getElementById('dimTemplate').value,
+        dimMemory: document.getElementById('dimMemory').value,
+        dimAction: document.getElementById('dimAction').value
+      };
+      saveConfigToStorage();
+      return currentConfig;
+    }
+
+    // Renderizar formulario de usuario dinámico
+    function renderUserUI(config) {
+      const goalOpts = config.dimGoalOpts.split(',').map(s=>s.trim());
+      const profileOpts = config.dimProfileOpts.split(',').map(s=>s.trim());
+      const restrictOpts = config.dimRestrictOpts.split(',').map(s=>s.trim());
+      
+      let html = '';
+      html += `<label>${config.dimGoalQ}</label><select id="userGoal">`;
+      goalOpts.forEach(opt => html += `<option>${opt}</option>`);
+      html += `</select>`;
+      
+      html += `<label>${config.dimProfileQ}</label><select id="userProfile">`;
+      profileOpts.forEach(opt => html += `<option>${opt}</option>`);
+      html += `</select>`;
+      
+      html += `<label>${config.dimRestrictQ}</label><div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;">`;
+      restrictOpts.forEach(opt => {
+        html += `<label style="display:flex; align-items:center; gap:6px;"><input type="checkbox" value="${opt}" class="userRestrict"> ${opt}</label>`;
+      });
+      html += `</div>`;
+      
+      html += `<label>${config.dimResourceLabel}</label>`;
+      if(config.dimResourceType === 'number') html += `<input type="number" id="userResource" value="30">`;
+      else html += `<input type="range" id="userResource" min="0" max="120" value="30">`;
+      
+      html += `<label>${config.dimContextQ}</label><input type="text" id="userContext" placeholder="...">`;
+      
+      document.getElementById('dynamicUserForm').innerHTML = html;
+    }
+
+    function updatePreview() {
+      const cfg = collectConfigFromForm();
+      document.getElementById('previewAgentName').innerText = cfg.name;
+      document.getElementById('previewPurpose').innerText = cfg.purpose;
+      renderUserUI(cfg);
+      document.getElementById('agentOutput').innerHTML = '<i>Configuración aplicada. Completa y ejecuta.</i>';
+    }
+
+    // Ejecutar agente
+    function runAgent() {
+      const cfg = currentConfig;
+      const source = cfg.dataSource;
+      
+      const goal = document.getElementById('userGoal')?.value || '';
+      const profile = document.getElementById('userProfile')?.value || '';
+      const resource = document.getElementById('userResource')?.value || '';
+      const context = document.getElementById('userContext')?.value || '';
+      
+      const restrictions = [];
+      document.querySelectorAll('.userRestrict:checked').forEach(cb => restrictions.push(cb.value));
+      
+      // Búsqueda Google
+      if(source === 'busqueda') {
+        const goalIdx = cfg.dimGoalOpts.split(',').map(s=>s.trim()).indexOf(goal);
+        let keyword = '';
+        if(goalIdx >=0) {
+          const keys = cfg.dimGoalKeys.split(',').map(s=>s.trim());
+          keyword = keys[goalIdx] || goal;
+        } else keyword = goal;
+        const query = `${keyword} ${restrictions.join(' ')} ${context}`;
+        const url = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+        document.getElementById('agentOutput').innerHTML = `🔍 <strong>Búsqueda:</strong> "${query}"<br><a href="${url}" target="_blank">🔗 Abrir resultados en Google</a>`;
+        window.open(url, '_blank');
+        return;
+      }
+      
+      // Datasets demo
+      let dataset = [];
+      if(source === 'demo_recetas') dataset = DEMO_RECETAS;
+      else if(source === 'demo_excusas') dataset = DEMO_EXCUSAS;
+      else if(source === 'demo_peliculas') dataset = DEMO_PELICULAS;
+      
+      let items = [...dataset];
+      
+      // Filtrar por objetivo (keyword)
+      const goalOpts = cfg.dimGoalOpts.split(',').map(s=>s.trim());
+      const goalIdx = goalOpts.indexOf(goal);
+      if(goalIdx >= 0) {
+        const keys = cfg.dimGoalKeys.split(',').map(s=>s.trim());
+        const keyword = keys[goalIdx];
+        if(items.length && items[0].categoria !== undefined) {
+          items = items.filter(it => it.categoria === keyword);
+        } else if(items.length && items[0].tipo !== undefined) {
+          items = items.filter(it => it.tipo.includes(keyword));
+        }
+      }
+      
+      // Recurso (tiempo/duración)
+      if(resource && !isNaN(resource)) {
+        const max = Number(resource);
+        items = items.filter(it => {
+          if(it.tiempo !== undefined) return it.tiempo <= max;
+          if(it.duracion !== undefined) return it.duracion <= max;
+          return true;
+        });
+      }
+      
+      // Restricciones
+      if(restrictions.length && items.length && items[0].restricciones) {
+        items = items.filter(it => restrictions.every(r => it.restricciones.includes(r)));
+      }
+      
+      if(items.length === 0) {
+        document.getElementById('agentOutput').innerHTML = '😕 Ningún resultado con esos filtros. Prueba a relajar.';
+        return;
+      }
+      
+      const selected = items[0];
+      const nombre = selected.nombre;
+      let detalles = '';
+      if(selected.kcal) detalles = `${selected.kcal} kcal, ${selected.proteina}g prot`;
+      else if(selected.duracion) detalles = `${selected.duracion} min, ${selected.plataforma}`;
+      else if(selected.credibilidad) detalles = `Credibilidad: ${selected.credibilidad}`;
+      else detalles = '';
+      
+      let mensaje = cfg.dimTemplate;
+      mensaje = mensaje.replace('{nombre}', nombre).replace('{detalles}', detalles);
+      const ctxVar = cfg.dimContextVar;
+      mensaje = mensaje.replace(`{${ctxVar}}`, context || '_________');
+      
+      if(cfg.dimAction === 'link') {
+        mensaje += `<br><a href="https://www.google.com/search?q=${encodeURIComponent(nombre)}" target="_blank">🔗 Más info</a>`;
+      }
+      
+      document.getElementById('agentOutput').innerHTML = mensaje;
+    }
+
+    // Eventos
+    document.getElementById('applyConfigBtn').addEventListener('click', updatePreview);
+    document.getElementById('runAgentBtn').addEventListener('click', runAgent);
+    document.getElementById('resetToDefaultBtn').addEventListener('click', ()=>{
+      currentConfig = {...DEFAULT_CONFIG};
+      populateForm();
+      updatePreview();
+      saveConfigToStorage();
+    });
+    
+    // Modal README
+    const modal = document.getElementById('readmeModal');
+    document.getElementById('showReadmeBtn').addEventListener('click', ()=> modal.style.display = 'flex');
+    document.getElementById('closeModalBtn').addEventListener('click', ()=> modal.style.display = 'none');
+    window.addEventListener('click', (e)=> { if(e.target === modal) modal.style.display = 'none'; });
+
+    // Inicio
+    loadConfigFromStorage();
+    updatePreview();
+  })();
+</script>
+</body>
+</html>
