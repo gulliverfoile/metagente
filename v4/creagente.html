@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
+  <title>🧠 Generador Universal de Agentes</title>
+  <!-- Librerías externas ligeras -->
+  <script src="https://cdn.jsdelivr.net/npm/idb@8.0.0/build/umd.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz@14..32&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; }
+    body { font-family: 'Inter', sans-serif; background: #f4f6f9; padding: 16px 12px 24px; color: #1e293b; transition: background 0.2s, color 0.2s; }
+    body.dark { background: #0f172a; color: #e2e8f0; }
+    body.dark .card { background: #1e293b; border-color: #334155; }
+    body.dark .chat-message.bot { background: #0f172a; color: #e2e8f0; }
+    body.dark .chat-message.user { background: #3b82f6; color: white; }
+    body.dark .item-card { background: #334155; border-color: #475569; }
+    body.dark .badge { background: #1e40af; color: white; }
+    body.dark .btn-secondary { background: #334155; color: white; border-color: #475569; }
+    .app-container { max-width: 1100px; margin: 0 auto; }
+    h1 { font-size: 1.8rem; font-weight: 600; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+    .card { background: white; border-radius: 24px; padding: 18px 16px; margin-bottom: 16px; border: 1px solid #e9eef2; }
+    .flex-between { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .btn { background: #0f172a; color: white; border: none; padding: 8px 16px; border-radius: 40px; cursor: pointer; font-weight: 500; }
+    .btn-secondary { background: #e2e8f0; color: #0f172a; border: 1px solid #dde3e9; }
+    .chat-container { max-height: 350px; overflow-y: auto; margin-bottom: 12px; display: flex; flex-direction: column; gap: 10px; }
+    .chat-message { padding: 8px 12px; border-radius: 20px; max-width: 85%; word-wrap: break-word; }
+    .chat-message.bot { background: #f1f5f9; align-self: flex-start; border-bottom-left-radius: 4px; }
+    .chat-message.user { background: #0f172a; color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
+    .chat-options { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+    .filters-panel { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; align-items: flex-end; }
+    .filter-group { flex: 1; min-width: 120px; }
+    .filter-group label { font-size: 0.7rem; font-weight: 600; display: block; }
+    select, input { padding: 6px 10px; border-radius: 40px; border: 1px solid #dde3e9; width: 100%; }
+    .item-card { display: flex; gap: 12px; background: white; border-radius: 20px; padding: 12px; margin-bottom: 12px; border: 1px solid #e9eef2; }
+    .item-poster { width: 60px; height: 80px; background: #e2e8f0; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 2rem; }
+    .item-info { flex: 1; }
+    .item-title { font-weight: 700; }
+    .badge { background: #eef2ff; padding: 2px 8px; border-radius: 20px; font-size: 0.7rem; margin-right: 6px; }
+    .actions { margin-top: 6px; display: flex; gap: 8px; }
+    .btn-icon { background: none; border: none; font-size: 1.2rem; cursor: pointer; }
+    .watchlist-item { background: #f8fafc; border-radius: 16px; padding: 6px 12px; margin-bottom: 6px; display: flex; justify-content: space-between; }
+    body.dark .watchlist-item { background: #0f172a; }
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); align-items: flex-end; justify-content: center; z-index: 1000; }
+    .modal-content { background: white; width: 100%; max-width: 550px; border-radius: 32px 32px 0 0; padding: 24px; max-height: 80vh; overflow-y: auto; }
+    body.dark .modal-content { background: #1e293b; }
+    .close-btn { float: right; font-size: 28px; cursor: pointer; background: none; border: none; }
+    .loader { border: 3px solid #f3f3f3; border-top: 3px solid #0f172a; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; display: inline-block; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+<div class="app-container">
+  <div class="flex-between">
+    <h1>🧠 Generador Universal de Agentes <span style="font-size:0.8rem;">v1.0</span></h1>
+    <div><button id="cargarAgenteBtn" class="btn">📂 Cargar agente (JSON)</button><button id="modoOscuroBtn" class="btn-secondary" style="margin-left:8px;">🌙</button></div>
+  </div>
+  <div id="noAgente" class="card" style="text-align:center">
+    <p>🔹 Carga un archivo <strong>agente.json</strong> para comenzar.</p>
+    <p>🔹 Puedes usar el ejemplo de recetas o el prompt para que una IA genere tu propio agente.</p>
+    <button id="cargarEjemploBtn" class="btn-secondary">📥 Cargar agente de ejemplo (Recetas)</button>
+  </div>
+  <div id="agenteContainer" style="display:none">
+    <!-- Chat -->
+    <div class="card">
+      <div id="chatMessages" class="chat-container"></div>
+      <div id="chatOptions" class="chat-options"></div>
+      <div class="chat-input-area" style="display:flex; gap:8px;">
+        <input type="text" id="chatInput" placeholder="Escribe algo... Ej: quiero algo barato y rápido">
+        <button id="sendChatBtn" class="btn">Enviar</button>
+      </div>
+    </div>
+    <!-- Filtros dinámicos -->
+    <div class="card">
+      <h3>🔍 Filtros</h3>
+      <div id="filtrosDinamicos" class="filters-panel"></div>
+      <button id="aplicarFiltrosBtn" class="btn-secondary">Aplicar filtros</button>
+    </div>
+    <!-- Resultados y watchlist -->
+    <div class="card">
+      <div class="flex-between"><h3>📋 Resultados</h3><span id="resultCount"></span></div>
+      <div id="resultadosLista"></div>
+      <div class="watchlist-section" style="margin-top:16px; border-top:1px solid #e9eef2; padding-top:12px;">
+        <div class="flex-between"><h3>⭐ Favoritos</h3><button id="clearWatchlistBtn" class="btn-secondary">Vaciar</button></div>
+        <div id="watchlistContainer"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal detalle -->
+<div id="detalleModal" class="modal"><div class="modal-content"><button class="close-btn" id="closeModalBtn">&times;</button><h3 id="modalTitulo"></h3><div id="modalContenido"></div><div class="row-buttons"><a href="#" id="modalLink" target="_blank" class="btn-secondary">🔍 Más información</a></div></div></div>
+
+<script>
+  (function(){
+    // ---------- CONFIGURACIÓN GLOBAL ----------
+    let agenteActual = null;         // objeto del agente cargado (meta, atributos, datos, sinonimos, etc.)
+    let datasetActual = [];          // array de ítems (después de cargar local o remoto)
+    let filtrosActuales = {};        // valores de filtros seleccionados
+    let watchlist = [];              // ids de favoritos
+    let valoraciones = {};           // { id: 'like' | 'dislike' }
+    let preferenciasKey = '';        // clave para localStorage (nombre del agente)
+
+    // Elementos DOM
+    const noAgenteDiv = document.getElementById('noAgente');
+    const agenteContainer = document.getElementById('agenteContainer');
+    const chatMessagesDiv = document.getElementById('chatMessages');
+    const chatOptionsDiv = document.getElementById('chatOptions');
+    const chatInput = document.getElementById('chatInput');
+    const sendChatBtn = document.getElementById('sendChatBtn');
+    const filtrosDinamicosDiv = document.getElementById('filtrosDinamicos');
+    const aplicarFiltrosBtn = document.getElementById('aplicarFiltrosBtn');
+    const resultadosListaDiv = document.getElementById('resultadosLista');
+    const resultCountSpan = document.getElementById('resultCount');
+    const watchlistContainer = document.getElementById('watchlistContainer');
+    const clearWatchlistBtn = document.getElementById('clearWatchlistBtn');
+    const modoOscuroBtn = document.getElementById('modoOscuroBtn');
+    const cargarAgenteBtn = document.getElementById('cargarAgenteBtn');
+    const cargarEjemploBtn = document.getElementById('cargarEjemploBtn');
+
+    // ---------- INDEXEDDB CACHE (usando idb) ----------
+    let dbPromise = null;
+    if (window.idb) {
+      dbPromise = window.idb.openDB('AgenteCache', 1, {
+        upgrade(db) {
+          if (!db.objectStoreNames.contains('datasets')) {
+            db.createObjectStore('datasets', { keyPath: 'id' });
+          }
+        }
+      });
+    }
+
+    async function guardarDatasetEnCache(agenteId, data, version) {
+      if (!dbPromise) return false;
+      const db = await dbPromise;
+      const tx = db.transaction('datasets', 'readwrite');
+      const store = tx.objectStore('datasets');
+      await store.put({ id: agenteId, data, version, lastUpdate: new Date().toISOString() });
+      await tx.done;
+      return true;
+    }
+
+    async function cargarDatasetDesdeCache(agenteId) {
+      if (!dbPromise) return null;
+      const db = await dbPromise;
+      const store = db.transaction('datasets', 'readonly').objectStore('datasets');
+      const record = await store.get(agenteId);
+      return record || null;
+    }
+
+    // ---------- CARGAR AGENTE (JSON) ----------
+    async function cargarAgente(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+          try {
+            const config = JSON.parse(e.target.result);
+            if (!config.meta || !config.atributos) throw new Error('JSON inválido: falta meta o atributos');
+            // Validar dataSource
+            let datos = [];
+            if (config.dataSource && config.dataSource.type === 'remote' && config.dataSource.url) {
+              // Modo remoto con caché
+              const agenteId = config.meta.nombre.replace(/\s/g, '_').toLowerCase();
+              const versionRemota = config.dataSource.version || '1.0';
+              const cache = await cargarDatasetDesdeCache(agenteId);
+              if (cache && cache.version === versionRemota) {
+                datos = cache.data;
+                addMessageSistema(`📦 Datos cargados desde caché local (${datos.length} registros).`, 'bot');
+              } else {
+                addMessageSistema(`⬇️ Descargando datos desde ${config.dataSource.url}...`, 'bot');
+                const response = await fetch(config.dataSource.url);
+                if (!response.ok) throw new Error('Error descargando datos remotos');
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('text/csv')) {
+                  const csvText = await response.text();
+                  const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
+                  datos = parsed.data;
+                } else {
+                  datos = await response.json();
+                }
+                await guardarDatasetEnCache(agenteId, datos, versionRemota);
+                addMessageSistema(`✅ Datos descargados y guardados en caché (${datos.length} registros).`, 'bot');
+              }
+            } else if (config.dataSource && config.dataSource.type === 'local' && config.dataSource.data) {
+              datos = config.dataSource.data;
+            } else if (config.datos) {
+              // Soporte para estructura antigua (datos incrustados directamente)
+              datos = config.datos;
+            } else {
+              throw new Error('No se encontraron datos (local, remote o datos)');
+            }
+            if (!Array.isArray(datos) || datos.length === 0) throw new Error('El dataset está vacío');
+            agenteActual = config;
+            datasetActual = datos;
+            // Inicializar filtros con valores por defecto
+            filtrosActuales = {};
+            for (let attr of config.atributos) {
+              if (attr.filtrable) {
+                if (attr.tipo === 'numero') filtrosActuales[attr.id] = { min: null, max: null };
+                else if (attr.tipo === 'categoria') filtrosActuales[attr.id] = '';
+                else if (attr.tipo === 'tags') filtrosActuales[attr.id] = [];
+              }
+            }
+            // Cargar preferencias del agente (valoraciones, watchlist)
+            preferenciasKey = `agente_${config.meta.nombre.replace(/\s/g, '_')}`;
+            const prefs = localStorage.getItem(preferenciasKey);
+            if (prefs) {
+              const p = JSON.parse(prefs);
+              valoraciones = p.valoraciones || {};
+              watchlist = p.watchlist || [];
+            } else {
+              valoraciones = {};
+              watchlist = [];
+            }
+            // Construir UI dinámica
+            construirFiltrosUI();
+            construirChatInicial();
+            aplicarFiltros();
+            noAgenteDiv.style.display = 'none';
+            agenteContainer.style.display = 'block';
+            resolve(config);
+          } catch (err) {
+            reject(err);
+          }
+        };
+        reader.onerror = () => reject(new Error('Error leyendo archivo'));
+        reader.readAsText(file);
+      });
+    }
+
+    function addMessageSistema(text, sender) {
+      const msgDiv = document.createElement('div');
+      msgDiv.className = `chat-message ${sender}`;
+      msgDiv.innerText = text;
+      chatMessagesDiv.appendChild(msgDiv);
+      chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight;
+    }
+
+    function construirChatInicial() {
+      chatMessagesDiv.innerHTML = '';
+      if (agenteActual.meta.descripcion) {
+        addMessageSistema(`🤖 ${agenteActual.meta.descripcion}`, 'bot');
+      }
+      addMessageSistema(`Escribe "ayuda" para ver comandos. Puedes buscar por ejemplo: "quiero algo barato"`, 'bot');
+    }
+
+    // Construir filtros UI según atributos
+    function construirFiltrosUI() {
+      filtrosDinamicosDiv.innerHTML = '';
+      for (let attr of agenteActual.atributos) {
+        if (!attr.filtrable) continue;
+        const group = document.createElement('div');
+        group.className = 'filter-group';
+        const label = document.createElement('label');
+        label.innerText = attr.nombre;
+        group.appendChild(label);
+        if (attr.tipo === 'categoria') {
+          const select = document.createElement('select');
+          select.id = `filtro_${attr.id}`;
+          const emptyOpt = document.createElement('option');
+          emptyOpt.value = '';
+          emptyOpt.innerText = 'Todos';
+          select.appendChild(emptyOpt);
+          for (let opt of attr.opciones) {
+            const option = document.createElement('option');
+            option.value = opt;
+            option.innerText = opt;
+            select.appendChild(option);
+          }
+          select.value = filtrosActuales[attr.id] || '';
+          select.addEventListener('change', (e) => { filtrosActuales[attr.id] = e.target.value; aplicarFiltros(); });
+          group.appendChild(select);
+        } else if (attr.tipo === 'numero') {
+          const wrapper = document.createElement('div');
+          wrapper.style.display = 'flex';
+          wrapper.style.gap = '4px';
+          const minInput = document.createElement('input');
+          minInput.type = 'number';
+          minInput.placeholder = 'Min';
+          minInput.value = filtrosActuales[attr.id]?.min || '';
+          minInput.addEventListener('change', (e) => { filtrosActuales[attr.id].min = e.target.value ? Number(e.target.value) : null; aplicarFiltros(); });
+          const maxInput = document.createElement('input');
+          maxInput.type = 'number';
+          maxInput.placeholder = 'Max';
+          maxInput.value = filtrosActuales[attr.id]?.max || '';
+          maxInput.addEventListener('change', (e) => { filtrosActuales[attr.id].max = e.target.value ? Number(e.target.value) : null; aplicarFiltros(); });
+          wrapper.appendChild(minInput);
+          wrapper.appendChild(maxInput);
+          group.appendChild(wrapper);
+        } else if (attr.tipo === 'tags') {
+          const divTags = document.createElement('div');
+          divTags.style.display = 'flex';
+          divTags.style.flexWrap = 'wrap';
+          divTags.style.gap = '6px';
+          for (let tag of attr.opciones) {
+            const chk = document.createElement('input');
+            chk.type = 'checkbox';
+            chk.value = tag;
+            chk.id = `tag_${attr.id}_${tag}`;
+            const lbl = document.createElement('label');
+            lbl.htmlFor = chk.id;
+            lbl.innerText = tag;
+            lbl.style.fontSize = '0.8rem';
+            const container = document.createElement('div');
+            container.style.display = 'inline-flex';
+            container.style.alignItems = 'center';
+            container.style.gap = '2px';
+            container.appendChild(chk);
+            container.appendChild(lbl);
+            divTags.appendChild(container);
+            chk.addEventListener('change', () => {
+              const selected = Array.from(divTags.querySelectorAll('input:checked')).map(cb => cb.value);
+              filtrosActuales[attr.id] = selected;
+              aplicarFiltros();
+            });
+          }
+          group.appendChild(divTags);
+        }
+        filtrosDinamicosDiv.appendChild(group);
+      }
+    }
+
+    // Filtrar dataset según filtrosActuales
+    function filtrarItems() {
+      let resultados = [...datasetActual];
+      for (let attr of agenteActual.atributos) {
+        if (!attr.filtrable) continue;
+        const valorFiltro = filtrosActuales[attr.id];
+        if (attr.tipo === 'categoria' && valorFiltro) {
+          resultados = resultados.filter(item => item[attr.id] === valorFiltro);
+        } else if (attr.tipo === 'numero' && (valorFiltro?.min !== null || valorFiltro?.max !== null)) {
+          resultados = resultados.filter(item => {
+            const val = item[attr.id];
+            if (val === undefined) return true;
+            if (valorFiltro.min !== null && val < valorFiltro.min) return false;
+            if (valorFiltro.max !== null && val > valorFiltro.max) return false;
+            return true;
+          });
+        } else if (attr.tipo === 'tags' && valorFiltro && valorFiltro.length) {
+          resultados = resultados.filter(item => {
+            const tagsItem = item[attr.id];
+            if (!Array.isArray(tagsItem)) return false;
+            return valorFiltro.some(t => tagsItem.includes(t));
+          });
+        }
+      }
+      // Ordenar por valoración (like sube, dislike baja)
+      resultados.sort((a,b) => {
+        const valA = valoraciones[a.id] === 'like' ? -1 : (valoraciones[a.id] === 'dislike' ? 1 : 0);
+        const valB = valoraciones[b.id] === 'like' ? -1 : (valoraciones[b.id] === 'dislike' ? 1 : 0);
+        if (valA !== valB) return valA - valB;
+        return 0;
+      });
+      return resultados;
+    }
+
+    function renderizarResultados(resultados) {
+      resultadosListaDiv.innerHTML = '';
+      const limit = 20;
+      const mostrar = resultados.slice(0, limit);
+      for (let item of mostrar) {
+        const card = document.createElement('div');
+        card.className = 'item-card';
+        // Imagen si existe
+        const attrImg = agenteActual.atributos.find(a => a.tipo === 'url' && a.id.includes('imagen'));
+        const imagenUrl = attrImg ? item[attrImg.id] : null;
+        const posterDiv = document.createElement('div');
+        posterDiv.className = 'item-poster';
+        posterDiv.innerText = imagenUrl ? '🖼️' : '📄';
+        if (imagenUrl) posterDiv.style.backgroundImage = `url(${imagenUrl})`;
+        // Info
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'item-info';
+        const titulo = item.titulo || item.nombre || item.id;
+        infoDiv.innerHTML = `<div class="item-title">${titulo}</div>`;
+        // Mostrar atributos visibles
+        for (let attr of agenteActual.atributos) {
+          if (attr.visible && attr.id !== 'imagen' && item[attr.id] !== undefined) {
+            let valor = item[attr.id];
+            if (Array.isArray(valor)) valor = valor.join(', ');
+            infoDiv.innerHTML += `<span class="badge">${attr.nombre}: ${valor}</span>`;
+          }
+        }
+        // Acciones
+        const actionsDiv = document.createElement('div');
+        actionsDiv.className = 'actions';
+        const favBtn = document.createElement('button');
+        favBtn.className = 'btn-icon';
+        favBtn.innerText = watchlist.includes(item.id) ? '⭐' : '☆';
+        favBtn.title = 'Favorito';
+        favBtn.onclick = (e) => { e.stopPropagation(); toggleWatchlist(item.id); };
+        const likeBtn = document.createElement('button');
+        likeBtn.className = 'btn-icon';
+        likeBtn.innerText = '👍';
+        likeBtn.style.color = valoraciones[item.id] === 'like' ? 'green' : 'gray';
+        likeBtn.onclick = (e) => { e.stopPropagation(); valoraciones[item.id] = 'like'; guardarPreferencias(); renderizarResultados(filtrarItems()); };
+        const dislikeBtn = document.createElement('button');
+        dislikeBtn.className = 'btn-icon';
+        dislikeBtn.innerText = '👎';
+        dislikeBtn.style.color = valoraciones[item.id] === 'dislike' ? 'red' : 'gray';
+        dislikeBtn.onclick = (e) => { e.stopPropagation(); valoraciones[item.id] = 'dislike'; guardarPreferencias(); renderizarResultados(filtrarItems()); };
+        const infoBtn = document.createElement('button');
+        infoBtn.className = 'btn-icon';
+        infoBtn.innerText = '🔍';
+        infoBtn.onclick = (e) => { e.stopPropagation(); mostrarDetalle(item); };
+        actionsDiv.appendChild(favBtn);
+        actionsDiv.appendChild(likeBtn);
+        actionsDiv.appendChild(dislikeBtn);
+        actionsDiv.appendChild(infoBtn);
+        infoDiv.appendChild(actionsDiv);
+        card.appendChild(posterDiv);
+        card.appendChild(infoDiv);
+        resultadosListaDiv.appendChild(card);
+      }
+      resultCountSpan.innerText = `${resultados.length} resultados`;
+      renderWatchlist();
+    }
+
+    function toggleWatchlist(id) {
+      if (watchlist.includes(id)) watchlist = watchlist.filter(i => i !== id);
+      else watchlist.push(id);
+      guardarPreferencias();
+      renderizarResultados(filtrarItems());
+    }
+
+    function renderWatchlist() {
+      watchlistContainer.innerHTML = '';
+      const items = watchlist.map(id => datasetActual.find(i => i.id === id)).filter(i => i);
+      if (items.length === 0) {
+        watchlistContainer.innerHTML = '<div style="padding:8px; text-align:center">Sin favoritos</div>';
+        return;
+      }
+      for (let item of items) {
+        const div = document.createElement('div');
+        div.className = 'watchlist-item';
+        div.innerHTML = `<span><strong>${item.titulo || item.nombre || item.id}</strong></span><button class="btn-icon" data-id="${item.id}">❌</button>`;
+        div.querySelector('button').onclick = () => toggleWatchlist(item.id);
+        watchlistContainer.appendChild(div);
+      }
+    }
+
+    function mostrarDetalle(item) {
+      const modal = document.getElementById('detalleModal');
+      document.getElementById('modalTitulo').innerText = item.titulo || item.nombre || item.id;
+      let html = '';
+      for (let attr of agenteActual.atributos) {
+        if (attr.visible && item[attr.id] !== undefined) {
+          let valor = item[attr.id];
+          if (Array.isArray(valor)) valor = valor.join(', ');
+          html += `<p><strong>${attr.nombre}:</strong> ${valor}</p>`;
+        }
+      }
+      document.getElementById('modalContenido').innerHTML = html;
+      const link = document.getElementById('modalLink');
+      link.href = `https://www.google.com/search?q=${encodeURIComponent(item.titulo || item.nombre || item.id)}`;
+      modal.style.display = 'flex';
+    }
+
+    function guardarPreferencias() {
+      if (!preferenciasKey) return;
+      const prefs = { valoraciones, watchlist };
+      localStorage.setItem(preferenciasKey, JSON.stringify(prefs));
+    }
+
+    function aplicarFiltros() {
+      const filtrados = filtrarItems();
+      renderizarResultados(filtrados);
+    }
+
+    // ---------- CHAT CON PROCESAMIENTO (sinónimos) ----------
+    function procesarConsulta(texto) {
+      const lower = texto.toLowerCase();
+      if (lower === 'ayuda') {
+        addMessageSistema("Comandos: puedes escribir 'quiero [categoría]' o 'busca [atributo] [valor]'. Ej: 'comida barata', 'película larga', 'ejercicio sin pesas'", 'bot');
+        return;
+      }
+      // Reiniciar filtros a vacío (aplica solo lo que se entienda)
+      for (let attr of agenteActual.atributos) {
+        if (attr.filtrable) {
+          if (attr.tipo === 'categoria') filtrosActuales[attr.id] = '';
+          else if (attr.tipo === 'numero') filtrosActuales[attr.id] = { min: null, max: null };
+          else if (attr.tipo === 'tags') filtrosActuales[attr.id] = [];
+        }
+      }
+      // Buscar coincidencias con sinónimos (si existen)
+      if (agenteActual.sinonimos) {
+        for (let [attrId, mapa] of Object.entries(agenteActual.sinonimos)) {
+          for (let [clave, valor] of Object.entries(mapa)) {
+            if (lower.includes(clave)) {
+              if (Array.isArray(valor) && valor.length === 2) {
+                // rango numérico
+                filtrosActuales[attrId] = { min: valor[0], max: valor[1] };
+              } else if (typeof valor === 'string') {
+                // categoría
+                filtrosActuales[attrId] = valor;
+              } else if (Array.isArray(valor)) {
+                // tags
+                filtrosActuales[attrId] = valor;
+              }
+            }
+          }
+        }
+      }
+      // Fallback: buscar palabras que coincidan con opciones de categorías
+      for (let attr of agenteActual.atributos) {
+        if (attr.tipo === 'categoria' && attr.opciones) {
+          for (let opt of attr.opciones) {
+            if (lower.includes(opt.toLowerCase())) {
+              filtrosActuales[attr.id] = opt;
+            }
+          }
+        }
+      }
+      // Actualizar UI de filtros
+      for (let attr of agenteActual.atributos) {
+        if (!attr.filtrable) continue;
+        const el = document.getElementById(`filtro_${attr.id}`);
+        if (el && attr.tipo === 'categoria') el.value = filtrosActuales[attr.id] || '';
+        // Para número y tags no actualizamos la UI automáticamente por simplicidad
+      }
+      aplicarFiltros();
+      addMessageSistema(`🔍 Filtros aplicados: ${Object.entries(filtrosActuales).filter(([k,v]) => v && (typeof v !== 'object' || v.min || v.max || (Array.isArray(v) && v.length))).map(([k,v]) => `${k}: ${JSON.stringify(v)}`).join(', ') || 'ninguno'}`, 'bot');
+    }
+
+    function addMessage(text, sender) {
+      const msgDiv = document.createElement('div');
+      msgDiv.className = `chat-message ${sender}`;
+      msgDiv.innerText = text;
+      chatMessagesDiv.appendChild(msgDiv);
+      chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight;
+    }
+
+    sendChatBtn.onclick = () => {
+      const txt = chatInput.value.trim();
+      if (!txt) return;
+      addMessage(txt, 'user');
+      chatInput.value = '';
+      procesarConsulta(txt);
+    };
+    chatInput.onkeypress = (e) => { if (e.key === 'Enter') sendChatBtn.onclick(); };
+
+    aplicarFiltrosBtn.onclick = () => { aplicarFiltros(); };
+    clearWatchlistBtn.onclick = () => { watchlist = []; guardarPreferencias(); aplicarFiltros(); };
+    modoOscuroBtn.onclick = () => { document.body.classList.toggle('dark'); localStorage.setItem('darkMode', document.body.classList.contains('dark')); };
+    if (localStorage.getItem('darkMode') === 'true') document.body.classList.add('dark');
+
+    // Cargar agente desde archivo
+    cargarAgenteBtn.onclick = () => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'application/json';
+      input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        try {
+          await cargarAgente(file);
+        } catch (err) {
+          alert('Error al cargar agente: ' + err.message);
+        }
+      };
+      input.click();
+    };
+
+    // Ejemplo de agente de recetas (incrustado)
+    const ejemploRecetas = {
+      "meta": { "nombre": "NutriAgente Recetas", "descripcion": "Recomendaciones de cocina con filtros" },
+      "atributos": [
+        { "id": "nombre", "nombre": "Nombre", "tipo": "texto", "visible": true, "filtrable": false },
+        { "id": "categoria", "nombre": "Categoría", "tipo": "categoria", "opciones": ["Desayuno", "Comida", "Cena", "Snack"], "visible": true, "filtrable": true },
+        { "id": "tiempo", "nombre": "Tiempo (min)", "tipo": "numero", "visible": true, "filtrable": true },
+        { "id": "precio", "nombre": "Precio (€)", "tipo": "numero", "visible": true, "filtrable": true },
+        { "id": "calorias", "nombre": "Calorías", "tipo": "numero", "visible": true, "filtrable": true },
+        { "id": "dieta", "nombre": "Dieta", "tipo": "tags", "opciones": ["Vegetariano", "Sin gluten", "Sin lactosa"], "visible": true, "filtrable": true }
+      ],
+      "datos": [
+        { "id": 1, "nombre": "Avena nocturna", "categoria": "Desayuno", "tiempo": 5, "precio": 1.2, "calorias": 320, "dieta": ["Vegetariano", "Sin gluten"] },
+        { "id": 2, "nombre": "Pechuga pollo plancha", "categoria": "Comida", "tiempo": 15, "precio": 2.5, "calorias": 450, "dieta": ["Sin gluten"] }
+      ],
+      "sinonimos": {
+        "tiempo": { "rápido": [0, 10], "normal": [10, 20] },
+        "precio": { "barato": [0, 2], "caro": [3, 10] },
+        "categoria": { "desayuno": "Desayuno", "comida": "Comida", "cena": "Cena" }
+      }
+    };
+    cargarEjemploBtn.onclick = async () => {
+      const fakeFile = new File([JSON.stringify(ejemploRecetas, null, 2)], "ejemplo.json", { type: "application/json" });
+      await cargarAgente(fakeFile);
+    };
+    // Cerrar modal
+    document.getElementById('closeModalBtn').onclick = () => document.getElementById('detalleModal').style.display = 'none';
+    window.onclick = (e) => { if (e.target === document.getElementById('detalleModal')) document.getElementById('detalleModal').style.display = 'none'; };
+  })();
+</script>
+</body>
+</html>
