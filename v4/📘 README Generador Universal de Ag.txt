@@ -1,228 +1,177 @@
-📘 README: Generador Universal de Agentes
-Este proyecto es un motor genérico en JavaScript puro (un solo archivo HTML) que permite crear agentes conversacionales personalizados sin necesidad de programar. Solo necesitas proporcionar un archivo agente.json que describa el dominio (recetas, películas, ejercicios, viajes, etc.), y la aplicación generará automáticamente:
+README: Generador Universal de Agentes (v2.0 – Hexagonal Edition)
+Un motor genérico en JavaScript puro (un solo archivo HTML) para crear agentes conversacionales sin programar.
+Solo necesitas un archivo agente.json describiendo el dominio (recetas, películas, ejercicios, viajes…) y la aplicación genera automáticamente:
 
-Un chat que entiende lenguaje natural básico.
+Un chat que entiende lenguaje natural básico (basado en sinónimos).
 
 Filtros dinámicos para refinar búsquedas.
 
-Lista de resultados con valoraciones (👍/👎) y favoritos.
+Lista de resultados con valoraciones (👍/👎) y favoritos ⭐.
 
-Persistencia de preferencias por agente.
+Persistencia de preferencias por agente (localStorage).
 
 Caché de datos externos mediante IndexedDB (para conjuntos de datos grandes).
 
+Arquitectura interna hexagonal (componentes desacoplados, EventBus, estado centralizado).
+
 🚀 ¿Qué hace exactamente?
-Carga la definición del agente desde un archivo JSON (subido por el usuario o por defecto).
+Carga la definición del agente desde un JSON (subido por el usuario o el ejemplo precargado).
 
-Obtiene los datos de una de tres fuentes:
+Obtiene los datos de una de estas fuentes:
 
-Datos incrustados en el propio JSON (dataSource.type = "local").
+dataSource.type = "local" → datos incrustados en el JSON.
 
-Datos remotos (JSON o CSV) con caché en IndexedDB (dataSource.type = "remote"). La primera vez descarga y guarda localmente; las siguientes veces carga desde caché.
+dataSource.type = "remote" → descarga JSON/CSV (con caché automática en IndexedDB, versión controlada).
+
+Compatibilidad hacia atrás con "datos": [...] (JSON antiguos).
 
 Construye dinámicamente la interfaz:
 
-Filtros (selectores, rangos numéricos, etiquetas) según los atributos definidos.
+Panel de filtros (selectores, rangos numéricos, checkboxes de tags) según los atributos definidos.
 
 Tarjetas de resultados mostrando los atributos marcados como visible.
 
-Chat con procesamiento de sinónimos para interpretar frases como "quiero algo barato y rápido".
+Chat que interpreta frases usando el diccionario de sinónimos.
 
 Gestiona preferencias por agente: valoraciones (like/dislike) y lista de favoritos, guardadas en localStorage.
 
-Permite consultar datos externos en tiempo real (opcional, mediante API, aunque el ejemplo actual no incluye APIs, está preparado para añadirlas).
+Funciona offline tras la primera carga de datos remotos (gracias a IndexedDB).
 
-🧠 ¿Cómo lo hace? (Tecnologías clave)
-HTML/CSS/JS vanilla: Sin frameworks, un único archivo ejecutable en cualquier navegador moderno.
+🧠 ¿Cómo lo hace? (Arquitectura interna)
+A diferencia de la versión anterior (todo mezclado), ahora sigue principios hexagonales dentro del propio HTML:
 
-IndexedDB + idb: Almacenamiento local de datasets grandes (cientos de MB). La librería idb simplifica la API asíncrona.
+Capa / Componente	Responsabilidad
+EventBus	Mensajero central. Los componentes solo emiten y escuchan eventos, nunca se tocan directamente.
+PersistenceService	Encapsula IndexedDB (caché de datasets) y localStorage (preferencias, modo oscuro).
+AgentEngine (lógica pura)	Filtrado, ordenación, procesamiento de sinónimos. Sin DOM, sin dependencias externas.
+AppState	Único almacén de estado (agente cargado, filtros, watchlist, valoraciones).
+Componentes UI (ChatUI, FilterUI, ResultListUI, ModalUI)	Cada uno maneja su trozo de DOM, escucha eventos del bus y emite acciones.
+App	Orquestador: cablea el bus, los servicios y la UI. Maneja el ciclo de vida.
+Flujo típico de una interacción:
 
-PapaParse: Parseo de archivos CSV remotos (si se usa dataSource.type = "remote" con CSV).
+Usuario escribe en el chat → ChatUI emite chat:message.
 
-LocalStorage: Guarda las preferencias del usuario (valoraciones, favoritos) para cada agente.
+App recibe el evento, llama al motor de sinónimos (AgentEngine) y actualiza el estado.
 
-Procesamiento de lenguaje básico: Usa un diccionario de sinónimos (definido en el JSON) para traducir frases del usuario a valores de filtros. Por ejemplo, "barato" → rango de precio [0, 2] euros.
+El estado emite state:filtersChanged → FilterUI se redibuja.
+
+Se aplican filtros → state:resultsUpdated → ResultListUI se redibuja.
+
+Ningún componente sabe de la existencia de los otros. Si mañana añades una entrada por voz, solo tocas ChatUI o creas un adaptador nuevo.
 
 📦 Estructura del archivo agente.json
-El archivo debe seguir este esquema. Te muestro un ejemplo completo para un agente de recetas:
+Ejemplo completo (recetas, con pulpo á feira incluido):
 
 json
 {
   "meta": {
     "nombre": "NutriAgente Recetas",
-    "descripcion": "Recomendaciones de cocina con filtros inteligentes",
+    "descripcion": "Recomendaciones de cocina con filtros inteligentes (y pulpo á feira bajo en calorías)",
     "version": "1.0"
   },
   "atributos": [
-    {
-      "id": "nombre",
-      "nombre": "Nombre",
-      "tipo": "texto",
-      "visible": true,
-      "filtrable": false
-    },
-    {
-      "id": "categoria",
-      "nombre": "Categoría",
-      "tipo": "categoria",
-      "opciones": ["Desayuno", "Comida", "Cena", "Snack"],
-      "visible": true,
-      "filtrable": true
-    },
-    {
-      "id": "tiempo",
-      "nombre": "Tiempo (min)",
-      "tipo": "numero",
-      "visible": true,
-      "filtrable": true
-    },
-    {
-      "id": "precio",
-      "nombre": "Precio (€)",
-      "tipo": "numero",
-      "visible": true,
-      "filtrable": true
-    },
-    {
-      "id": "dieta",
-      "nombre": "Dieta",
-      "tipo": "tags",
-      "opciones": ["Vegetariano", "Sin gluten", "Sin lactosa"],
-      "visible": true,
-      "filtrable": true
-    }
+    { "id": "nombre", "nombre": "Nombre", "tipo": "texto", "visible": true, "filtrable": false },
+    { "id": "categoria", "nombre": "Categoría", "tipo": "categoria", "opciones": ["Desayuno","Comida","Cena","Snack"], "visible": true, "filtrable": true },
+    { "id": "tiempo", "nombre": "Tiempo (min)", "tipo": "numero", "visible": true, "filtrable": true },
+    { "id": "precio", "nombre": "Precio (€)", "tipo": "numero", "visible": true, "filtrable": true },
+    { "id": "calorias", "nombre": "Calorías", "tipo": "numero", "visible": true, "filtrable": true },
+    { "id": "dieta", "nombre": "Dieta", "tipo": "tags", "opciones": ["Vegetariano","Sin gluten","Sin lactosa"], "visible": true, "filtrable": true }
   ],
-  "datos": [
-    {
-      "id": 1,
-      "nombre": "Avena nocturna",
-      "categoria": "Desayuno",
-      "tiempo": 5,
-      "precio": 1.2,
-      "dieta": ["Vegetariano", "Sin gluten"]
-    },
-    {
-      "id": 2,
-      "nombre": "Pechuga pollo plancha",
-      "categoria": "Comida",
-      "tiempo": 15,
-      "precio": 2.5,
-      "dieta": ["Sin gluten"]
-    }
-  ],
+  "dataSource": {
+    "type": "local",
+    "data": [
+      { "id":1, "nombre":"Avena nocturna", "categoria":"Desayuno", "tiempo":5, "precio":1.2, "calorias":320, "dieta":["Vegetariano","Sin gluten"] },
+      { "id":2, "nombre":"Pulpo á feira", "categoria":"Cena", "tiempo":30, "precio":5.0, "calorias":150, "dieta":["Sin gluten"] },
+      { "id":3, "nombre":"Ensalada César", "categoria":"Comida", "tiempo":10, "precio":3.5, "calorias":280, "dieta":["Sin lactosa"] }
+    ]
+  },
   "sinonimos": {
-    "tiempo": {
-      "rápido": [0, 10],
-      "normal": [10, 20],
-      "largo": [20, 60]
-    },
-    "precio": {
-      "barato": [0, 2],
-      "económico": [0, 2.5],
-      "caro": [3, 10]
-    },
-    "categoria": {
-      "desayuno": "Desayuno",
-      "comida": "Comida",
-      "cena": "Cena"
-    }
+    "tiempo": { "rápido":[0,10], "normal":[10,20], "lento":[20,60] },
+    "precio": { "barato":[0,2], "económico":[0,2.5], "caro":[3,10] },
+    "categoria": { "desayuno":"Desayuno", "comida":"Comida", "cena":"Cena" }
   }
 }
-Explicación de campos
-meta: Información general del agente.
+Campos importantes
+meta: nombre y descripción (se muestran al cargar).
 
-atributos: Lista de propiedades que tienen los ítems. Cada atributo define:
+atributos: define las propiedades de los ítems. Cada uno tiene:
 
-id: identificador interno (debe coincidir con la clave en los datos).
-
-nombre: texto visible para el usuario.
+id: clave en los datos.
 
 tipo: texto, categoria, numero, tags, url, boolean.
 
-visible: si se muestra en la tarjeta de resultados.
+visible: si se muestra en la tarjeta de resultado.
 
 filtrable: si aparece en el panel de filtros.
 
-opciones: (solo para categoria o tags) lista de valores posibles.
+opciones: (solo categoria o tags) valores posibles.
 
-datos: Array de ítems. Cada ítem debe tener un id único y los campos definidos en atributos.
+dataSource (recomendado):
 
-sinonimos (opcional pero muy recomendado): Mapea palabras del chat a valores de filtros. Puede asignar:
+type: "local" → data contiene el array de ítems.
 
-Una categoría concreta ("desayuno": "Desayuno").
+type: "remote" → url apunta a un JSON o CSV externo, y version controla la caché.
 
-Un rango numérico ("barato": [0, 2]).
+datos (compatible con JSON antiguos): array directo si no usas dataSource.
 
-Una lista de tags ("vegetariano": ["Vegetariano"]).
+sinonimos: mapea palabras del chat a valores de filtro. Pueden ser:
 
-Fuente de datos externa (en lugar de datos incrustados)
-Puedes usar dataSource para cargar datos desde una URL remota (JSON o CSV). Ejemplo:
+Categoría: "desayuno": "Desayuno".
 
-json
-{
-  "meta": { ... },
-  "atributos": [ ... ],
-  "dataSource": {
-    "type": "remote",
-    "url": "https://ejemplo.com/mis_recetas.csv",
-    "version": "2025-04-01"
-  }
-}
-La primera vez descargará el archivo, lo parseará (si es CSV con PapaParse) y lo guardará en IndexedDB. En sucesivas cargas, usará la caché a menos que la version cambie.
+Rango numérico: "barato": [0, 2].
 
-🤖 Prompt para que una IA genere tu agente.json
-Puedes copiar y pegar este prompt en cualquier IA (ChatGPT, Claude, Gemini, etc.) y te devolverá el JSON listo para usar:
+Tags: "vegetariano": ["Vegetariano"].
+
+🤖 Prompt para que una IA te genere el JSON
+Copia y pega esto en ChatGPT, Claude o similar:
 
 text
-Quiero que actúes como un generador de agentes para una aplicación web. Debes generar un JSON válido siguiendo el esquema del Generador Universal de Agentes. El agente será sobre [DESCRIBE AQUÍ TU DOMINIO: ej. "recomendación de películas", "rutinas de ejercicio", "destinos de viaje", "productos de supermercado"].
+Quiero que actúes como generador de agentes para el "Generador Universal de Agentes". Debes generar un JSON válido siguiendo el esquema. El agente será sobre [DESCRIBE TU DOMINIO: ej. "recomendación de películas"].
 
-Debes incluir:
-- meta: nombre y descripción (creativos pero claros).
-- atributos: al menos 4 atributos, con tipos variados (categoria, numero, tags). Cada atributo debe tener id (en minúsculas, sin espacios), nombre (para mostrar), tipo, visible (true) y filtrable (true excepto para el nombre o identificador). Para categoría, incluye opciones (array de strings). Para tags, incluye opciones.
-- datos: al menos 5 ejemplos realistas (cada uno con id único y valores para todos los atributos). Usa datos ficticios pero coherentes.
-- sinonimos: al menos 3 mapeos para facilitar el chat (ej. "barato" a rango de precio, "rápido" a tiempo mínimo, "familiar" a una categoría, etc.). Los rangos numéricos se expresan como [min, max].
+Incluye:
+- meta: nombre y descripción.
+- atributos: al menos 4, con tipos variados (categoria, numero, tags). Cada uno con id (minúsculas, sin espacios), nombre, tipo, visible (true) y filtrable (true excepto el nombre). Para categoría y tags, añade opciones.
+- dataSource: type "local" con data: al menos 5 ejemplos realistas.
+- sinonimos: al menos 3 mapeos (ej. "barato" a rango, "rápido" a tiempo, "familiar" a categoría).
 
-Devuelve SOLO el JSON, sin explicaciones adicionales, y asegúrate de que sea válido (comillas dobles, sin comentarios).
-Ejemplo de uso del prompt (rellenando el dominio):
-"El agente será sobre recomendación de películas, con atributos: título, género, año, duración, puntuación IMDB."
-
-La IA generará un JSON con películas de ejemplo y sinónimos como "corta" → duración < 90 min, "alta nota" → puntuación > 8, etc.
-
+Devuelve SOLO el JSON válido, sin explicaciones.
 🖥️ Cómo usar la aplicación
-Guarda el código HTML completo en un archivo index.html.
+Guarda el código HTML en un archivo index.html.
 
 Ábrelo con cualquier navegador moderno (doble clic).
 
-Haz clic en "📂 Cargar agente (JSON)" y selecciona tu archivo agente.json.
+Haz clic en 📂 Cargar agente (JSON) y selecciona tu archivo agente.json.
 
-También puedes usar el botón "Cargar agente de ejemplo" para probar con recetas.
+O prueba con el botón 📥 Cargar agente de ejemplo (recetas con pulpo).
 
-Una vez cargado, verás:
+Una vez cargado:
 
-Un chat donde escribir comandos (ej. "quiero algo barato y rápido").
+Escribe en el chat (ej. "algo rápido y barato").
 
-Filtros dinámicos (según los atributos marcados como filtrable).
+Usa los filtros manualmente si lo prefieres.
 
-Lista de resultados con botones de valoración y favoritos.
+Valora ítems con 👍/👎 y guárdalos en ⭐ favoritos.
 
-Todas tus valoraciones y favoritos se guardan automáticamente para ese agente.
+Tus preferencias se guardan automáticamente para ese agente.
 
-Si el agente usa datos remotos, la primera carga puede tardar unos segundos; luego irá muy rápido.
+Si el agente usa datos remotos, la primera carga puede tardar unos segundos (descarga + cache). Luego será instantánea.
 
 ⚠️ Limitaciones conocidas
-Los datos externos deben estar en un servidor que permita CORS (GitHub raw, Netlify, Vercel, etc. funcionan bien).
+Los datos externos deben estar en servidores con CORS permitido (GitHub raw, Netlify, Vercel…).
 
-El tamaño máximo de caché en IndexedDB depende del navegador y del espacio libre en disco, pero normalmente permite cientos de MB.
+El tamaño de caché en IndexedDB depende del navegador, pero soporta cientos de MB sin problema.
 
-El procesamiento del chat es básico (basado en sinónimos). No es una IA real, pero para dominios pequeños es suficiente.
+El chat es procesamiento de sinónimos, no IA generativa. Suficiente para dominios pequeños y bien definidos.
 
-No hay soporte para autenticación ni para compartir agentes en la nube (es 100% local).
+Es 100% local: sin backend, sin autenticación, sin compartir en nube.
 
-🧠 Posibles mejoras futuras
-APIs en tiempo real: añadir dataSource.type = "api" con endpoints paginados.
+🧠 Mejoras futuras (posibles)
+Añadir dataSource.type = "api" con paginación y búsqueda en tiempo real.
 
-Editor visual de atributos para crear agentes sin escribir JSON.
+Editor visual de atributos para crear agentes sin tocar JSON.
 
-Exportar/importar la configuración completa del agente (incluyendo datos cacheados).
+Exportar/importar agente completo (datos cacheados incluidos).
 
-Sugerencias activas en el chat (autocompletado).
+Sugerencias en el chat (autocompletado basado en el dataset).
+
+Adaptadores de entrada adicionales (voz, gestos) sin cambiar el núcleo, solo añadiendo emisores de eventos.
