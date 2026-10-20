@@ -1,0 +1,1011 @@
+
+📄 Contenido de los Archivos
+1. index.html (raíz)
+html
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+  <title>Fábrica Abstracta de Agentes · Pipeline</title>
+  <link rel="stylesheet" href="/src/ui/styles/main.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/handlebars@4.7.8/dist/handlebars.min.js"></script>
+</head>
+<body>
+  <div id="app" class="app"></div>
+  <script type="module" src="/src/app.js"></script>
+</body>
+</html>
+2. package.json (raíz)
+json
+{
+  "name": "fabrica-abstracta-agentes",
+  "version": "2.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  },
+  "dependencies": {
+    "chart.js": "^4.4.0",
+    "handlebars": "^4.7.8"
+  }
+}
+3. vite.config.js (raíz)
+javascript
+import { defineConfig } from 'vite';
+
+export default defineConfig({
+  server: {
+    port: 5173
+  },
+  build: {
+    target: 'esnext'
+  }
+});
+4. README.md (raíz) – opcional, te doy uno resumido
+markdown
+# Fábrica Abstracta de Agentes v2.0
+
+Motor de pipelines genérico para crear agentes personalizados sin código.
+
+## Instalación
+```bash
+npm install
+npm run dev
+Estructura
+src/core/pipelineExecutor.js: ejecuta los pasos.
+
+src/steps/: implementaciones de pasos (input, filter, codeCheck, etc.).
+
+src/agents/: agentes concretos (RecipeAgent, CodeReviewAgent).
+
+Licencia
+AGPL v3
+
+text
+
+### 5. `LICENSE` (AGPLv3) – puedes copiarlo de https://www.gnu.org/licenses/agpl-3.0.txt
+
+---
+
+### 6. `src/app.js`
+
+```javascript
+import { EventBus } from './core/eventBus.js';
+import { AgentRegistry } from './core/agentRegistry.js';
+import { Orchestrator } from './core/orchestrator.js';
+import { Context } from './core/context.js';
+import { ConfigStorage } from './storage/configStorage.js';
+import { HistoryStorage } from './storage/historyStorage.js';
+import { ContextStorage } from './storage/contextStorage.js';
+import { Logger } from './utils/logger.js';
+import { EVENTS } from './utils/constants.js';
+import { CreatorPanel } from './ui/creatorPanel.js';
+import { UserPanel } from './ui/userPanel.js';
+import { AgentManager } from './ui/agentManager.js';
+import { Renderer } from './ui/renderer.js';
+import { NLPipeline } from './nlp/nlpPipeline.js';
+import { RecipeAgent } from './agents/recipeAgent.js';
+import { CodeReviewAgent } from './agents/codeReviewAgent.js';
+
+const eventBus = new EventBus();
+const context = new Context(eventBus);
+const registry = new AgentRegistry(eventBus);
+const orchestrator = new Orchestrator(eventBus, registry, context);
+const nlpPipeline = new NLPipeline(eventBus);
+
+const configStorage = new ConfigStorage(eventBus, registry);
+const historyStorage = new HistoryStorage(eventBus);
+const contextStorage = new ContextStorage(eventBus, context);
+
+if (import.meta.env.DEV) {
+  new Logger(eventBus);
+}
+
+const renderer = new Renderer();
+const creatorPanel = new CreatorPanel(eventBus, renderer);
+const userPanel = new UserPanel(eventBus, renderer);
+const agentManager = new AgentManager(eventBus, registry, renderer);
+
+const app = document.getElementById('app');
+app.appendChild(creatorPanel.render());
+app.appendChild(agentManager.render());
+app.appendChild(userPanel.render());
+
+configStorage.load();
+
+if (registry.list().length === 0) {
+  registry.register(RecipeAgent.defaultConfig);
+  registry.register(CodeReviewAgent.defaultConfig);
+}
+
+eventBus.emit(EVENTS.SYSTEM_READY, { timestamp: Date.now() });
+7. src/core/eventBus.js
+javascript
+export class EventBus {
+  constructor() {
+    this.events = new Map();
+  }
+
+  on(event, callback) {
+    if (!this.events.has(event)) {
+      this.events.set(event, new Set());
+    }
+    this.events.get(event).add(callback);
+    return () => this.off(event, callback);
+  }
+
+  off(event, callback) {
+    if (this.events.has(event)) {
+      this.events.get(event).delete(callback);
+    }
+  }
+
+  emit(event, payload) {
+    if (this.events.has(event)) {
+      this.events.get(event).forEach(cb => {
+        try {
+          cb(payload);
+        } catch (err) {
+          console.error(`Error in event ${event}:`, err);
+        }
+      });
+    }
+  }
+}
+8. src/core/agentRegistry.js
+javascript
+import { EVENTS } from '../utils/constants.js';
+
+export class AgentRegistry {
+  #agents = new Map();
+  #eventBus;
+
+  constructor(eventBus) {
+    this.#eventBus = eventBus;
+  }
+
+  register(config) {
+    const id = config.id || `${config.name.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`;
+    const agentConfig = { ...config, id };
+    this.#agents.set(id, agentConfig);
+    this.#eventBus.emit(EVENTS.AGENT_REGISTERED, { agentConfig });
+    return id;
+  }
+
+  update(id, config) {
+    if (!this.#agents.has(id)) return false;
+    const updated = { ...config, id };
+    this.#agents.set(id, updated);
+    this.#eventBus.emit(EVENTS.AGENT_UPDATED, { agentId: id, config: updated });
+    return true;
+  }
+
+  remove(id) {
+    if (!this.#agents.has(id)) return false;
+    this.#agents.delete(id);
+    this.#eventBus.emit(EVENTS.AGENT_REMOVED, { agentId: id });
+    return true;
+  }
+
+  get(id) {
+    return this.#agents.get(id);
+  }
+
+  list() {
+    return Array.from(this.#agents.values());
+  }
+}
+9. src/core/orchestrator.js
+javascript
+import { EVENTS } from '../utils/constants.js';
+
+export class Orchestrator {
+  #eventBus;
+  #registry;
+  #context;
+
+  constructor(eventBus, registry, context) {
+    this.#eventBus = eventBus;
+    this.#registry = registry;
+    this.#context = context;
+
+    this.#eventBus.on(EVENTS.USER_COMMAND, this.#handleUserCommand.bind(this));
+    this.#eventBus.on(EVENTS.NLP_RESULT, this.#handleNLPResult.bind(this));
+  }
+
+  #handleUserCommand({ rawText }) {
+    this.#eventBus.emit(EVENTS.NLP_ANALYSIS_REQUESTED, { text: rawText });
+  }
+
+  #handleNLPResult({ intent, entities }) {
+    const agent = this.#selectAgent(intent);
+    if (!agent) {
+      this.#eventBus.emit(EVENTS.ORCHESTRATOR_RESPONSE, {
+        message: 'No tengo un agente para esa petición.'
+      });
+      return;
+    }
+
+    this.#eventBus.emit(EVENTS.AGENT_DELEGATE, {
+      agentId: agent.id,
+      params: entities
+    });
+  }
+
+  #selectAgent(intent) {
+    const agents = this.#registry.list();
+    return agents.find(agent => agent.keywords?.some(kw => intent.includes(kw)));
+  }
+}
+10. src/core/context.js
+javascript
+import { EVENTS } from '../utils/constants.js';
+
+export class Context {
+  #data = {};
+  #eventBus;
+
+  constructor(eventBus) {
+    this.#eventBus = eventBus;
+  }
+
+  get(key) {
+    return this.#data[key];
+  }
+
+  set(key, value) {
+    this.#data[key] = value;
+    this.#eventBus.emit(EVENTS.CONTEXT_UPDATED, { key, value });
+  }
+
+  getAll() {
+    return { ...this.#data };
+  }
+
+  load(data) {
+    this.#data = { ...data };
+    this.#eventBus.emit(EVENTS.CONTEXT_LOADED, { data: this.#data });
+  }
+}
+11. src/core/pipelineExecutor.js
+javascript
+import { InputStep } from '../steps/inputStep.js';
+import { FilterStep } from '../steps/filterStep.js';
+import { TransformStep } from '../steps/transformStep.js';
+import { OutputStep } from '../steps/outputStep.js';
+import { ConditionStep } from '../steps/conditionStep.js';
+import { LoopStep } from '../steps/loopStep.js';
+import { CodeCheckStep } from '../steps/codeCheckStep.js';
+import { CallApiStep } from '../steps/callApiStep.js';
+
+export class PipelineExecutor {
+  static stepMap = {
+    input: InputStep,
+    filter: FilterStep,
+    transform: TransformStep,
+    output: OutputStep,
+    condition: ConditionStep,
+    loop: LoopStep,
+    codeCheck: CodeCheckStep,
+    callApi: CallApiStep
+  };
+
+  constructor(eventBus, context, agentId) {
+    this.eventBus = eventBus;
+    this.context = context;
+    this.agentId = agentId;
+  }
+
+  async execute(pipeline, initialParams = {}) {
+    let localContext = { ...this.context.getAll(), ...initialParams };
+    const steps = pipeline;
+
+    for (let i = 0; i < steps.length; i++) {
+      const stepConfig = steps[i];
+      const StepClass = PipelineExecutor.stepMap[stepConfig.type];
+      if (!StepClass) {
+        throw new Error(`Tipo de paso desconocido: ${stepConfig.type}`);
+      }
+
+      const stepInstance = new StepClass(this.eventBus, this.agentId);
+      try {
+        localContext = await stepInstance.execute(localContext, stepConfig);
+      } catch (error) {
+        this.eventBus.emit('pipeline:stepError', { agentId: this.agentId, step: stepConfig, error });
+        throw error;
+      }
+
+      if (localContext.__halt) {
+        break;
+      }
+    }
+
+    return localContext;
+  }
+}
+12. src/steps/baseStep.js
+javascript
+export class BaseStep {
+  constructor(eventBus, agentId) {
+    this.eventBus = eventBus;
+    this.agentId = agentId;
+  }
+
+  async execute(context, config) {
+    throw new Error('execute() must be implemented');
+  }
+
+  evaluateExpression(expression, context) {
+    const func = new Function('context', `return (${expression})`);
+    return func(context);
+  }
+
+  interpolate(template, context) {
+    return template.replace(/\{\{([^}]+)\}\}/g, (_, path) => {
+      return path.trim().split('.').reduce((obj, key) => obj?.[key], context) ?? '';
+    });
+  }
+}
+13. src/steps/inputStep.js
+javascript
+import { BaseStep } from './baseStep.js';
+
+export class InputStep extends BaseStep {
+  async execute(context, config) {
+    this.eventBus.emit('pipeline:inputRequest', {
+      agentId: this.agentId,
+      fields: config.fields,
+      callback: (userInput) => {
+        this.eventBus.emit('pipeline:inputReceived', { agentId: this.agentId, input: userInput });
+      }
+    });
+
+    return new Promise((resolve) => {
+      const handler = (data) => {
+        if (data.agentId === this.agentId) {
+          this.eventBus.off('pipeline:inputReceived', handler);
+          resolve({ ...context, input: data.input });
+        }
+      };
+      this.eventBus.on('pipeline:inputReceived', handler);
+    });
+  }
+}
+14. src/steps/filterStep.js
+javascript
+import { BaseStep } from './baseStep.js';
+import { CustomJsonAdapter } from '../dataAdapters/customJsonAdapter.js';
+import { applyDeclarativeRules } from '../rulesEngine/ruleEngine.js';
+
+export class FilterStep extends BaseStep {
+  async execute(context, config) {
+    const adapter = new CustomJsonAdapter();
+    const dataset = await adapter.fetch({ customDataset: config.dataset });
+
+    const userInput = {};
+    for (const rule of config.rules) {
+      userInput[rule.field] = this.interpolate(rule.value, context);
+    }
+
+    const filtered = applyDeclarativeRules(dataset, { dimensions: { goal: { rules: { '*': config.rules[0] } } } }, userInput);
+    context.filtered = filtered;
+    return context;
+  }
+}
+15. src/steps/transformStep.js
+javascript
+import { BaseStep } from './baseStep.js';
+
+export class TransformStep extends BaseStep {
+  async execute(context, config) {
+    const template = config.template;
+    const outputField = config.outputField || 'transformed';
+    const compiled = Handlebars.compile(template);
+    context[outputField] = compiled(context);
+    return context;
+  }
+}
+16. src/steps/outputStep.js
+javascript
+import { BaseStep } from './baseStep.js';
+
+export class OutputStep extends BaseStep {
+  async execute(context, config) {
+    const format = config.format || 'text';
+    const value = context[config.valueField] || context.transformed || JSON.stringify(context);
+
+    this.eventBus.emit('pipeline:output', {
+      agentId: this.agentId,
+      format,
+      value
+    });
+
+    return context;
+  }
+}
+17. src/steps/conditionStep.js
+javascript
+import { BaseStep } from './baseStep.js';
+import { PipelineExecutor } from '../core/pipelineExecutor.js';
+
+export class ConditionStep extends BaseStep {
+  async execute(context, config) {
+    const condition = this.evaluateExpression(config.expression, context);
+    const subPipeline = condition ? config.truePipeline : config.falsePipeline;
+    if (subPipeline) {
+      const executor = new PipelineExecutor(this.eventBus, { getAll: () => context }, this.agentId);
+      return await executor.execute(subPipeline, context);
+    }
+    return context;
+  }
+}
+18. src/steps/loopStep.js
+javascript
+import { BaseStep } from './baseStep.js';
+import { PipelineExecutor } from '../core/pipelineExecutor.js';
+
+export class LoopStep extends BaseStep {
+  async execute(context, config) {
+    const items = context[config.itemsField] || [];
+    const results = [];
+    const executor = new PipelineExecutor(this.eventBus, { getAll: () => context }, this.agentId);
+    
+    for (const item of items) {
+      const itemContext = { ...context, item };
+      const result = await executor.execute(config.pipeline, itemContext);
+      results.push(result);
+    }
+    
+    context[config.outputField || 'loopResults'] = results;
+    return context;
+  }
+}
+19. src/steps/codeCheckStep.js
+javascript
+import { BaseStep } from './baseStep.js';
+
+export class CodeCheckStep extends BaseStep {
+  async execute(context, config) {
+    const code = context.input?.[config.inputField] || context[config.inputField];
+    const language = context.input?.[config.languageField] || 'javascript';
+
+    // Simulación de análisis (en producción usarías un Web Worker con ESLint)
+    const issues = [];
+    if (code.includes('var ')) {
+      issues.push({ line: 1, message: 'Evita usar `var`, usa `let` o `const`.' });
+    }
+    if (code.includes('console.log')) {
+      issues.push({ line: 2, message: 'Quita los console.log en producción.' });
+    }
+
+    context.issues = issues;
+    return context;
+  }
+}
+20. src/steps/callApiStep.js
+javascript
+import { BaseStep } from './baseStep.js';
+
+export class CallApiStep extends BaseStep {
+  async execute(context, config) {
+    const url = this.interpolate(config.url, context);
+    const options = {
+      method: config.method || 'GET',
+      headers: config.headers || {}
+    };
+
+    if (config.bodyTemplate) {
+      options.body = JSON.stringify(this.interpolate(config.bodyTemplate, context));
+    }
+
+    const response = await fetch(url, options);
+    const data = await response.json();
+    context[config.outputField || 'apiResponse'] = data;
+    return context;
+  }
+}
+21. src/agents/baseAgent.js
+javascript
+export class BaseAgent {
+  constructor(id, config, eventBus, context) {
+    this.id = id;
+    this.config = config;
+    this.eventBus = eventBus;
+    this.context = context;
+  }
+
+  async execute(params) {
+    throw new Error('execute() must be implemented');
+  }
+
+  canHandle(intent) {
+    return this.config.keywords?.some(kw => intent.includes(kw)) ?? false;
+  }
+}
+22. src/agents/recipeAgent.js
+javascript
+import { BaseAgent } from './baseAgent.js';
+import { PipelineExecutor } from '../core/pipelineExecutor.js';
+import { EVENTS } from '../utils/constants.js';
+
+export class RecipeAgent extends BaseAgent {
+  static defaultConfig = {
+    id: 'recipe-agent-default',
+    name: 'NutriAgente',
+    description: 'Recomienda recetas según objetivos',
+    keywords: ['receta', 'cocina', 'cenar', 'comer'],
+    pipeline: [
+      { type: 'input', fields: ['goal', 'maxTime', 'restrictions', 'supermercado'] },
+      { 
+        type: 'filter', 
+        dataset: [
+          { nombre: 'Revuelto de claras', kcal: 150, proteina: 22, tiempo: 8, categoria: 'light', restricciones: ['Sin gluten'] },
+          { nombre: 'Pechuga de pollo', kcal: 280, proteina: 35, tiempo: 15, categoria: 'protein', restricciones: [] },
+          { nombre: 'Ensalada de garbanzos', kcal: 310, proteina: 12, tiempo: 10, categoria: 'cheap', restricciones: ['Vegano'] }
+        ],
+        rules: [
+          { field: 'categoria', operator: '=', value: '{{input.goal}}' },
+          { field: 'tiempo', operator: '<=', value: '{{input.maxTime}}' }
+        ]
+      },
+      { type: 'transform', template: '🔥 {{filtered.0.nombre}} | {{filtered.0.kcal}} kcal | {{input.supermercado}}' },
+      { type: 'output', format: 'html' }
+    ]
+  };
+
+  async execute(params) {
+    const executor = new PipelineExecutor(this.eventBus, this.context, this.id);
+    const resultContext = await executor.execute(this.config.pipeline, params);
+    
+    const message = resultContext.transformed || resultContext.output;
+    this.eventBus.emit(EVENTS.AGENT_EXECUTED, { agentId: this.id, result: { message } });
+    return { message };
+  }
+}
+23. src/agents/codeReviewAgent.js
+javascript
+import { BaseAgent } from './baseAgent.js';
+import { PipelineExecutor } from '../core/pipelineExecutor.js';
+import { EVENTS } from '../utils/constants.js';
+
+export class CodeReviewAgent extends BaseAgent {
+  static defaultConfig = {
+    id: 'code-review-agent',
+    name: 'CodeBuddy',
+    description: 'Revisa fragmentos de código',
+    keywords: ['código', 'revisar', 'bug', 'refactorizar', 'función'],
+    pipeline: [
+      { type: 'input', fields: ['code', 'language'] },
+      { type: 'codeCheck', inputField: 'code', languageField: 'language' },
+      { type: 'condition', expression: 'context.issues.length > 0',
+        truePipeline: [
+          { type: 'transform', template: '❌ Problemas:\n{{#each issues}}- {{message}} (línea {{line}})\n{{/each}}' },
+          { type: 'output', format: 'markdown' }
+        ],
+        falsePipeline: [
+          { type: 'transform', template: '✅ No se detectaron problemas. ¡Buen trabajo!' },
+          { type: 'output', format: 'text' }
+        ]
+      }
+    ]
+  };
+
+  async execute(params) {
+    const executor = new PipelineExecutor(this.eventBus, this.context, this.id);
+    const resultContext = await executor.execute(this.config.pipeline, params);
+    
+    const message = resultContext.transformed || resultContext.output;
+    this.eventBus.emit(EVENTS.AGENT_EXECUTED, { agentId: this.id, result: { message } });
+    return { message };
+  }
+}
+24. src/ui/creatorPanel.js (versión simplificada para pipelines JSON)
+javascript
+import { EVENTS } from '../utils/constants.js';
+
+export class CreatorPanel {
+  #eventBus;
+  #container;
+
+  constructor(eventBus) {
+    this.#eventBus = eventBus;
+    this.#container = document.createElement('div');
+    this.#container.className = 'card creator-panel';
+  }
+
+  render() {
+    this.#container.innerHTML = `
+      <h2>🛠️ Nuevo Agente (Pipeline JSON)</h2>
+      <label>Nombre</label>
+      <input id="agentName" value="Mi Agente">
+      <label>Palabras clave (coma)</label>
+      <input id="agentKeywords" value="agente,personalizado">
+      <label>Pipeline (JSON)</label>
+      <textarea id="pipelineJson" rows="12">[
+  {"type":"input","fields":["dato1","dato2"]},
+  {"type":"transform","template":"Has dicho {{input.dato1}}"},
+  {"type":"output","format":"text"}
+]</textarea>
+      <button class="btn" id="saveAgentBtn">💾 Guardar Agente</button>
+    `;
+
+    this.#container.querySelector('#saveAgentBtn').addEventListener('click', () => {
+      const name = this.#container.querySelector('#agentName').value;
+      const keywords = this.#container.querySelector('#agentKeywords').value.split(',').map(s => s.trim());
+      let pipeline;
+      try {
+        pipeline = JSON.parse(this.#container.querySelector('#pipelineJson').value);
+      } catch (e) {
+        alert('JSON inválido');
+        return;
+      }
+
+      const config = {
+        name,
+        keywords,
+        pipeline
+      };
+
+      this.#eventBus.emit(EVENTS.UI_CONFIG_APPLIED, { config });
+      alert('Agente guardado');
+    });
+
+    return this.#container;
+  }
+}
+25. src/ui/userPanel.js (adaptado para input dinámico)
+javascript
+import { EVENTS } from '../utils/constants.js';
+
+export class UserPanel {
+  #eventBus;
+  #container;
+  #currentInputCallback = null;
+
+  constructor(eventBus) {
+    this.#eventBus = eventBus;
+    this.#container = document.createElement('div');
+    this.#container.className = 'card user-panel';
+    this.#eventBus.on(EVENTS.ORCHESTRATOR_RESPONSE, this.#showResponse.bind(this));
+    this.#eventBus.on('pipeline:inputRequest', this.#handleInputRequest.bind(this));
+    this.#eventBus.on('pipeline:output', this.#showOutput.bind(this));
+  }
+
+  render() {
+    this.#container.innerHTML = `
+      <h2>🤖 Asistente</h2>
+      <label>Escribe tu petición:</label>
+      <textarea id="userCommand" rows="2" placeholder="Ej: Quiero una receta light en 10 minutos"></textarea>
+      <button class="btn" id="sendCommandBtn">🚀 Enviar</button>
+      <div id="dynamicInputArea"></div>
+      <div id="agentOutput" class="preview-box">Esperando tu orden...</div>
+    `;
+
+    this.#container.querySelector('#sendCommandBtn').addEventListener('click', () => {
+      const text = this.#container.querySelector('#userCommand').value;
+      this.#eventBus.emit(EVENTS.USER_COMMAND, { rawText: text });
+    });
+
+    return this.#container;
+  }
+
+  #showResponse({ message }) {
+    this.#container.querySelector('#agentOutput').innerHTML = message;
+  }
+
+  #showOutput({ value }) {
+    this.#container.querySelector('#agentOutput').innerHTML = value;
+  }
+
+  #handleInputRequest({ fields, callback }) {
+    this.#currentInputCallback = callback;
+    const area = this.#container.querySelector('#dynamicInputArea');
+    let html = '<div class="input-modal"><h3>Completa los datos</h3>';
+    fields.forEach(field => {
+      html += `<label>${field}</label><input id="input_${field}" placeholder="${field}" />`;
+    });
+    html += '<button class="btn" id="submitInputBtn">Enviar</button></div>';
+    area.innerHTML = html;
+
+    area.querySelector('#submitInputBtn').addEventListener('click', () => {
+      const input = {};
+      fields.forEach(field => {
+        input[field] = area.querySelector(`#input_${field}`).value;
+      });
+      area.innerHTML = '';
+      this.#currentInputCallback(input);
+    });
+  }
+}
+26. src/ui/agentManager.js (mínimo)
+javascript
+export class AgentManager {
+  #eventBus;
+  #registry;
+  #container;
+
+  constructor(eventBus, registry) {
+    this.#eventBus = eventBus;
+    this.#registry = registry;
+    this.#container = document.createElement('div');
+    this.#container.className = 'card agent-manager';
+  }
+
+  render() {
+    const agents = this.#registry.list();
+    this.#container.innerHTML = `
+      <h2>📋 Agentes Registrados</h2>
+      <ul>
+        ${agents.map(a => `<li>${a.name} (${a.id})</li>`).join('')}
+      </ul>
+    `;
+    return this.#container;
+  }
+}
+27. src/ui/renderer.js (vacío o mínimo)
+javascript
+export class Renderer {
+  // Métodos de utilidad para renderizado (se pueden expandir)
+}
+28. src/utils/constants.js
+javascript
+export const EVENTS = {
+  USER_COMMAND: 'USER_COMMAND',
+  NLP_ANALYSIS_REQUESTED: 'NLP_ANALYSIS_REQUESTED',
+  NLP_RESULT: 'NLP_RESULT',
+  AGENT_DELEGATE: 'AGENT_DELEGATE',
+  AGENT_EXECUTED: 'AGENT_EXECUTED',
+  ORCHESTRATOR_RESPONSE: 'ORCHESTRATOR_RESPONSE',
+  AGENT_REGISTERED: 'AGENT_REGISTERED',
+  AGENT_UPDATED: 'AGENT_UPDATED',
+  AGENT_REMOVED: 'AGENT_REMOVED',
+  CONTEXT_UPDATED: 'CONTEXT_UPDATED',
+  CONTEXT_LOADED: 'CONTEXT_LOADED',
+  UI_CONFIG_APPLIED: 'UI_CONFIG_APPLIED',
+  SYSTEM_READY: 'SYSTEM_READY'
+};
+29. src/utils/logger.js
+javascript
+import { EVENTS } from './constants.js';
+
+export class Logger {
+  constructor(eventBus) {
+    eventBus.on('*', (payload) => {
+      console.log(`[Event]`, payload);
+    });
+  }
+}
+30. src/utils/helpers.js
+javascript
+export const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+31. src/storage/configStorage.js
+javascript
+import { EVENTS } from '../utils/constants.js';
+
+export class ConfigStorage {
+  constructor(eventBus, registry) {
+    this.eventBus = eventBus;
+    this.registry = registry;
+    this.eventBus.on(EVENTS.AGENT_REGISTERED, () => this.save());
+    this.eventBus.on(EVENTS.AGENT_UPDATED, () => this.save());
+    this.eventBus.on(EVENTS.AGENT_REMOVED, () => this.save());
+  }
+
+  load() {
+    const saved = localStorage.getItem('agentsConfig');
+    if (saved) {
+      const configs = JSON.parse(saved);
+      configs.forEach(cfg => this.registry.register(cfg));
+    }
+  }
+
+  save() {
+    const configs = this.registry.list();
+    localStorage.setItem('agentsConfig', JSON.stringify(configs));
+  }
+}
+32. src/storage/historyStorage.js
+javascript
+export class HistoryStorage {
+  constructor(eventBus) {
+    this.eventBus = eventBus;
+    this.history = [];
+    this.eventBus.on('agent:executed', (data) => this.add(data));
+  }
+
+  add(entry) {
+    this.history.push({ ...entry, timestamp: Date.now() });
+    if (this.history.length > 50) this.history.shift();
+    localStorage.setItem('agentHistory', JSON.stringify(this.history));
+  }
+
+  get() {
+    return this.history;
+  }
+}
+33. src/storage/contextStorage.js
+javascript
+import { EVENTS } from '../utils/constants.js';
+
+export class ContextStorage {
+  constructor(eventBus, context) {
+    this.eventBus = eventBus;
+    this.context = context;
+    const saved = localStorage.getItem('agentContext');
+    if (saved) {
+      context.load(JSON.parse(saved));
+    }
+    this.eventBus.on(EVENTS.CONTEXT_UPDATED, () => this.save());
+  }
+
+  save() {
+    localStorage.setItem('agentContext', JSON.stringify(this.context.getAll()));
+  }
+}
+34. src/dataAdapters/baseAdapter.js
+javascript
+export class BaseAdapter {
+  async fetch(config) {
+    throw new Error('fetch() must be implemented');
+  }
+}
+35. src/dataAdapters/customJsonAdapter.js
+javascript
+import { BaseAdapter } from './baseAdapter.js';
+
+export class CustomJsonAdapter extends BaseAdapter {
+  async fetch(config) {
+    if (config.customDataset) {
+      return config.customDataset;
+    }
+    return [];
+  }
+}
+36. src/dataAdapters/searchAdapter.js
+javascript
+import { BaseAdapter } from './baseAdapter.js';
+
+export class SearchAdapter extends BaseAdapter {
+  async fetch(config) {
+    const query = config.query || '';
+    return { type: 'search', url: `https://www.google.com/search?q=${encodeURIComponent(query)}` };
+  }
+}
+37. src/nlp/intentClassifier.js
+javascript
+export class IntentClassifier {
+  classify(text) {
+    const lower = text.toLowerCase();
+    if (lower.includes('receta') || lower.includes('cocina')) return 'receta';
+    if (lower.includes('código') || lower.includes('revisar')) return 'codereview';
+    return 'general';
+  }
+}
+38. src/nlp/entityExtractor.js
+javascript
+export class EntityExtractor {
+  extract(text) {
+    const entities = {};
+    const timeMatch = text.match(/(\d+)\s*(min|minutos?)/i);
+    if (timeMatch) entities.maxTime = parseInt(timeMatch[1]);
+    if (text.includes('light')) entities.goal = 'light';
+    if (text.includes('proteína')) entities.goal = 'protein';
+    return entities;
+  }
+}
+39. src/nlp/nlpPipeline.js
+javascript
+import { EVENTS } from '../utils/constants.js';
+import { IntentClassifier } from './intentClassifier.js';
+import { EntityExtractor } from './entityExtractor.js';
+
+export class NLPipeline {
+  #classifier;
+  #extractor;
+  #eventBus;
+
+  constructor(eventBus) {
+    this.#classifier = new IntentClassifier();
+    this.#extractor = new EntityExtractor();
+    this.#eventBus = eventBus;
+    this.#eventBus.on(EVENTS.NLP_ANALYSIS_REQUESTED, this.#analyze.bind(this));
+  }
+
+  #analyze({ text }) {
+    const intent = this.#classifier.classify(text);
+    const entities = this.#extractor.extract(text);
+    this.#eventBus.emit(EVENTS.NLP_RESULT, { intent, entities, confidence: 0.8 });
+  }
+}
+40. src/rulesEngine/ruleEngine.js
+javascript
+export function applyDeclarativeRules(items, config, userInput) {
+  let filtered = [...items];
+  // Implementación simplificada para el ejemplo
+  if (config.dimensions?.goal?.rules) {
+    const rules = config.dimensions.goal.rules['*'];
+    if (rules) {
+      filtered = filtered.filter(item => {
+        const itemValue = item[rules.campo];
+        const userValue = userInput[rules.campo];
+        switch (rules.operator) {
+          case '=': return itemValue == userValue;
+          case '<=': return itemValue <= userValue;
+          default: return true;
+        }
+      });
+    }
+  }
+  return filtered;
+}
+41. src/workers/lintWorker.js
+javascript
+self.onmessage = (e) => {
+  const { code } = e.data;
+  const issues = [];
+  if (code.includes('var ')) issues.push({ line: 1, message: 'Usa let/const en lugar de var' });
+  self.postMessage({ issues });
+};
+42. src/ui/styles/main.css
+css
+* { box-sizing: border-box; margin: 0; }
+body {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: #f1f5f9;
+  padding: 16px;
+  color: #0f172a;
+}
+.app {
+  max-width: 800px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.card {
+  background: white;
+  border-radius: 24px;
+  padding: 20px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  border: 1px solid #eef2f6;
+}
+.btn {
+  background: #0f172a;
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 40px;
+  font-weight: 600;
+  cursor: pointer;
+  width: 100%;
+  margin-top: 12px;
+}
+.preview-box {
+  background: #f1f5f9;
+  border-radius: 16px;
+  padding: 16px;
+  margin-top: 16px;
+}
+input, textarea, select {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 18px;
+  border: 1.5px solid #d9e2ef;
+  font-size: 1rem;
+  margin-bottom: 12px;
+}
+label {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #334155;
+  display: block;
+  margin-bottom: 4px;
+}
+🎉 ¡Proyecto completo!
