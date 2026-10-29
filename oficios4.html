@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="generator" content="Fábrica de Agentes v4">
+<meta name="license" content="AGPL-3.0-or-later">
+<meta name="data-attribution" content="Atlas del Patrimonio Inmaterial de Andalucía (CC BY 4.0) — IAPH">
+<title>Fábrica de Agentes · Oficios de Andalucía</title>
+<style id="appStyles">
+  * { box-sizing: border-box; margin: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f1f5f9; padding: 16px 12px 32px; color: #0f172a; }
+  .app { max-width: 750px; margin: 0 auto; }
+  h1, h2, h3 { font-weight: 600; letter-spacing: -0.02em; }
+  h1 { font-size: 1.4rem; }
+  h2 { font-size: 1.2rem; margin-bottom: 8px; }
+  h3 { font-size: 1rem; margin: 16px 0 8px; }
+  .card { background: white; border-radius: 28px; padding: 20px; margin-bottom: 24px; box-shadow: 0 8px 20px rgba(0,0,0,0.02); border: 1px solid #eef2f6; }
+  #appHeader { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
+  label { font-weight: 600; font-size: 0.9rem; color: #334155; margin: 12px 0 4px; display: block; }
+  input, select, textarea { width: 100%; padding: 12px 16px; border-radius: 18px; border: 1.5px solid #d9e2ef; background: white; font-size: 1rem; margin-bottom: 8px; font-family: inherit; }
+  textarea { font-family: ui-monospace, Menlo, monospace; font-size: 0.85rem; }
+  .dimension-box { background: #f8fafc; border-radius: 22px; padding: 18px; margin-bottom: 18px; border-left: 6px solid #2563eb; }
+  .btn { background: #0f172a; color: white; border: none; padding: 14px 20px; border-radius: 60px; font-weight: 600; font-size: 1rem; width: 100%; cursor: pointer; margin-top: 8px; }
+  .btn:hover { background: #1e293b; }
+  .btn-outline { background: white; color: #0f172a; border: 1.5px solid #d9e2ef; padding: 10px 18px; border-radius: 60px; font-weight: 600; cursor: pointer; font-size: 0.9rem; }
+  .btn-outline:hover { background: #f8fafc; }
+  .flex-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .flex-row > * { flex: 1; min-width: 120px; }
+  .preview-box { background: #f1f5f9; border-radius: 20px; padding: 20px; margin-top: 20px; min-height: 60px; }
+  .badge { background: #e0e7ff; color: #1e3a8a; padding: 4px 12px; border-radius: 30px; font-size: 0.75rem; vertical-align: middle; }
+  .modal { display: none; position: fixed; inset: 0; background: #00000050; backdrop-filter: blur(4px); align-items: center; justify-content: center; z-index: 1000; }
+  .modal-content { background: white; max-width: 550px; width: calc(100% - 32px); border-radius: 36px; padding: 24px; max-height: 80vh; overflow-y: auto; }
+  .close-btn { float: right; font-size: 28px; cursor: pointer; line-height: 1; }
+  .note { font-size: 0.8rem; color: #64748b; margin-top: 4px; }
+  .history-item { padding: 8px 12px; background: #f8fafc; border-radius: 12px; margin-bottom: 6px; font-size: 0.9rem; }
+  .checkbox-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+  .chk { display: inline-flex; align-items: center; gap: 6px; background: #f8fafc; padding: 6px 12px; border-radius: 30px; font-weight: 500; margin: 0; cursor: pointer; }
+  .chk input { width: auto; margin: 0; }
+  .purpose { color: #475569; margin-bottom: 12px; }
+  .attribution { font-size: 0.75rem; color: #94a3b8; margin-top: 16px; padding-top: 12px; border-top: 1px solid #eef2f6; }
+  .player-card { margin-top: 8px; }
+  #testResults { margin-top: 12px; font-family: ui-monospace, monospace; font-size: 0.8rem; }
+  .test-ok { color: #15803d; }
+  .test-ko { color: #b91c1c; }
+  pre { background: #f1f5f9; padding: 12px; border-radius: 12px; overflow-x: auto; font-size: 0.8rem; margin-top: 8px; }
+  @media (max-width: 500px) { .flex-row { flex-direction: column; align-items: stretch; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <header id="appHeader">
+    <h1>🧱 Fábrica de Agentes <span class="badge">v4 · Oficios</span></h1>
+    <button id="showReadmeBtn" class="btn-outline">📖 README</button>
+  </header>
+
+  <div class="card" id="creatorPanel">
+    <h2 style="margin-bottom: 16px;">🛠️ Configuración del Agente</h2>
+
+    <label>Nombre del agente</label>
+    <input type="text" id="agentName" value="Oficios de Andalucía">
+
+    <label>Propósito</label>
+    <input type="text" id="agentPurpose" value="Descubre oficios tradicionales del Atlas del Patrimonio Inmaterial de Andalucía.">
+
+    <label>Atribución de datos (se muestra en el player)</label>
+    <input type="text" id="agentAttribution" value="Fuente: Atlas del Patrimonio Inmaterial de Andalucía (CC BY 4.0) — IAPH. Datos de ejemplo.">
+
+    <label>📂 Origen de datos</label>
+    <select id="dataSourceType">
+      <option value="inline">📦 Embebido (inline, recomendado para export offline)</option>
+      <option value="api">🌐 API externa (URL)</option>
+      <option value="search">🔍 Búsqueda en Google</option>
+    </select>
+
+    <div id="apiConfigPanel" style="display:none;">
+      <label>URL de la API</label>
+      <input type="text" id="apiUrl" placeholder="https://api.ejemplo.com/datos">
+      <label>API Key (opcional)</label>
+      <input type="text" id="apiKey" placeholder="Bearer token">
+      <label>Mapeo de campos — dirección: { interno: externo }</label>
+      <textarea id="fieldMapping" rows="2">{"nombre": "title", "kcal": "calories"}</textarea>
+      <p class="note">Izquierda: nombre interno. Derecha: nombre en la API.</p>
+    </div>
+
+    <h3>📊 Datos del agente (JSON array)</h3>
+    <textarea id="agentData" rows="8"></textarea>
+    <div class="flex-row">
+      <button class="btn-outline" id="previewDataBtn">👁️ Vista previa (3 ítems)</button>
+      <button class="btn-outline" id="inferSchemaBtn">🔍 Inferir esquema</button>
+    </div>
+    <div id="dataPreview" class="note"></div>
+
+    <h3>📐 Esquema de datos</h3>
+    <textarea id="dataSchema" rows="4"></textarea>
+    <p class="note">Contrato: los datos deberían respetar esta forma.</p>
+
+    <h3>🧭 Dimensiones del usuario</h3>
+
+    <div class="dimension-box">
+      <label>🎯 Pregunta objetivo</label>
+      <input type="text" id="dimGoalQ">
+      <label>Opciones (separadas por coma)</label>
+      <input type="text" id="dimGoalOpts">
+      <label>Reglas por opción (JSON)</label>
+      <textarea id="dimGoalRules" rows="4"></textarea>
+    </div>
+
+    <div class="dimension-box">
+      <label>🏷️ Pregunta perfil</label>
+      <input type="text" id="dimProfileQ">
+      <label>Opciones</label>
+      <input type="text" id="dimProfileOpts">
+    </div>
+
+    <div class="dimension-box">
+      <label>🚫 Pregunta restricciones</label>
+      <input type="text" id="dimRestrictQ">
+      <label>Opciones</label>
+      <input type="text" id="dimRestrictOpts">
+      <label>Campo en datos</label>
+      <input type="text" id="dimRestrictField">
+      <p class="note">Array: deben coincidir TODAS. String: basta con UNA.</p>
+    </div>
+
+    <div class="dimension-box">
+      <label>⏳ Etiqueta del recurso limitante</label>
+      <input type="text" id="dimResourceLabel">
+      <label>Tipo</label>
+      <select id="dimResourceType">
+        <option value="number">Numérico</option>
+        <option value="slider">Deslizador</option>
+      </select>
+      <label>Campo en datos</label>
+      <input type="text" id="dimResourceField">
+    </div>
+
+    <div class="dimension-box">
+      <label>📍 Pregunta contexto</label>
+      <input type="text" id="dimContextQ">
+      <label>Variable para plantilla (sin llaves)</label>
+      <input type="text" id="dimContextVar">
+    </div>
+
+    <div class="dimension-box">
+      <label>🎤 Estilo (tono)</label>
+      <select id="dimTone">
+        <option value="motivador">Motivador</option>
+        <option value="serio">Experto</option>
+        <option value="zen">Zen</option>
+      </select>
+      <label>Plantilla de salida (HTML permitido)</label>
+      <textarea id="dimTemplate" rows="4"></textarea>
+      <p class="note">Variables: {{nombre}}, {{categoria}}, {{provincia}}, {{detalles}}, y tu variable de contexto.</p>
+    </div>
+
+    <div class="flex-row">
+      <div>
+        <label>🧠 Memoria</label>
+        <select id="dimMemory">
+          <option value="none">No recordar</option>
+          <option value="last3">No repetir últimos 3</option>
+        </select>
+      </div>
+      <div>
+        <label>⚡ Acción</label>
+        <select id="dimAction">
+          <option value="show">Solo mostrar</option>
+          <option value="link">Enlace externo</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="margin-top: 20px;">
+      <button class="btn" id="applyConfigBtn">✅ Aplicar configuración</button>
+      <button class="btn-outline" id="exportAgentBtn" style="width:100%; margin-top:8px;">📦 Exportar player como HTML</button>
+      <p class="note">El HTML exportado contiene SOLO el player y los datos.</p>
+    </div>
+
+    <div id="testResults"></div>
+  </div>
+
+  <div id="playerContainer"></div>
+</div>
+
+<template id="playerTemplate">
+  <div class="card player-card">
+    <h2 id="previewAgentName"></h2>
+    <p id="previewPurpose" class="purpose"></p>
+    <div id="dynamicUserForm"></div>
+    <button class="btn" id="runAgentBtn">🚀 Ejecutar Agente</button>
+    <div id="agentOutput" class="preview-box"><i>Completa el formulario y ejecuta.</i></div>
+    <div class="history-section">
+      <h3>📋 Historial de recomendaciones</h3>
+      <div id="historyContainer"></div>
+      <button class="btn-outline" id="clearHistoryBtn" style="margin-top: 8px;">🗑️ Limpiar historial</button>
+    </div>
+    <p class="attribution" id="playerAttribution"></p>
+  </div>
+</template>
+
+<div class="modal" id="readmeModal">
+  <div class="modal-content">
+    <span class="close-btn" id="closeModalBtn">&times;</span>
+    <h2>📘 README · v4</h2>
+    <div style="margin-top:16px;">
+      <p><strong>Qué es</strong></p>
+      <p>Fábrica de agentes declarativos. Configuras, aplicas, previsualizas y exportas un HTML autónomo con el player y los datos embebidos. El exportado funciona con doble clic, sin red, sin CDN.</p>
+      <p style="margin-top:12px;"><strong>Flujo</strong></p>
+      <ol style="margin-left: 20px;">
+        <li>Edita los datos en "Datos del agente".</li>
+        <li>Ajusta dimensiones.</li>
+        <li>"Aplicar configuración" → se guarda y previsualiza.</li>
+        <li>"Exportar player como HTML" → descarga HTML autónomo.</li>
+      </ol>
+      <p style="margin-top:12px;"><strong>Modos</strong></p>
+      <ul>
+        <li><code>index.html</code> → editor + preview.</li>
+        <li><code>index.html#player</code> → solo player.</li>
+        <li>HTML exportado → detecta <code>window.AGENT_CONFIG</code> y arranca en modo player.</li>
+      </ul>
+      <p style="margin-top:12px;"><strong>Licencia</strong></p>
+      <p>Código: AGPL-3.0-or-later. Datos de ejemplo: CC BY 4.0 (Atlas del Patrimonio Inmaterial de Andalucía, IAPH).</p>
+    </div>
+  </div>
+</div>
+
+<script id="engineScript">
+window.AGENT_ENGINE = (function () {
+  'use strict';
+
+  const OFICIOS_ANDALUCIA = [
+    { nombre: 'Alfarería', categoria: 'Cerámica', provincia: 'Granada', materia_prima: 'barro', estado: 'vivo', dificultad: 3, descripcion: 'Vasijas y utensilios de barro cocido.' },
+    { nombre: 'Cestería de esparto', categoria: 'Fibras vegetales', provincia: 'Almería', materia_prima: 'esparto', estado: 'en_riesgo', dificultad: 4, descripcion: 'Trenzado de fibras vegetales para utensilios.' },
+    { nombre: 'Forja tradicional', categoria: 'Metal', provincia: 'Sevilla', materia_prima: 'metal', estado: 'vivo', dificultad: 4, descripcion: 'Trabajo del hierro en la fragua.' },
+    { nombre: 'Tejares', categoria: 'Cerámica', provincia: 'Córdoba', materia_prima: 'barro', estado: 'en_riesgo', dificultad: 3, descripcion: 'Fabricación artesanal de tejas y ladrillos.' },
+    { nombre: 'Salinas', categoria: 'Alimentación', provincia: 'Cádiz', materia_prima: 'sal', estado: 'vivo', dificultad: 2, descripcion: 'Extracción de sal marina en balsas.' },
+    { nombre: 'Molinos de aceite', categoria: 'Alimentación', provincia: 'Jaén', materia_prima: 'aceituna', estado: 'vivo', dificultad: 3, descripcion: 'Elaboración tradicional de aceite de oliva.' },
+    { nombre: 'Marroquinería', categoria: 'Cuero', provincia: 'Málaga', materia_prima: 'cuero', estado: 'en_riesgo', dificultad: 3, descripcion: 'Artesanía del cuero y la piel.' },
+    { nombre: 'Vidrio soplado', categoria: 'Vidrio', provincia: 'Sevilla', materia_prima: 'vidrio', estado: 'en_riesgo', dificultad: 5, descripcion: 'Soplado artesanal de vidrio.' },
+    { nombre: 'Sillería de madera', categoria: 'Madera', provincia: 'Huelva', materia_prima: 'madera', estado: 'vivo', dificultad: 4, descripcion: 'Fabricación de sillas y muebles.' },
+    { nombre: 'Bordado popular', categoria: 'Textil', provincia: 'Sevilla', materia_prima: 'textil', estado: 'en_riesgo', dificultad: 5, descripcion: 'Bordado tradicional a mano.' },
+    { nombre: 'Guarnicionería', categoria: 'Cuero', provincia: 'Córdoba', materia_prima: 'cuero', estado: 'vivo', dificultad: 4, descripcion: 'Artesanía de aparejos para caballerías.' },
+    { nombre: 'Yeserías', categoria: 'Construcción', provincia: 'Granada', materia_prima: 'yeso', estado: 'perdido', dificultad: 5, descripcion: 'Tallado de yeso en la arquitectura tradicional.' },
+    { nombre: 'Azulejería', categoria: 'Cerámica', provincia: 'Sevilla', materia_prima: 'cerámica', estado: 'vivo', dificultad: 4, descripcion: 'Fabricación artesanal de azulejos.' },
+    { nombre: 'Tonelería', categoria: 'Madera', provincia: 'Cádiz', materia_prima: 'madera', estado: 'vivo', dificultad: 4, descripcion: 'Fabricación de barriles y toneles.' },
+    { nombre: 'Herrería artística', categoria: 'Metal', provincia: 'Granada', materia_prima: 'metal', estado: 'en_riesgo', dificultad: 4, descripcion: 'Trabajo del hierro para aperos y rejas.' },
+    { nombre: 'Matanza tradicional', categoria: 'Alimentación', provincia: 'Huelva', materia_prima: 'carne', estado: 'en_riesgo', dificultad: 2, descripcion: 'Elaboración casera de embutidos.' },
+    { nombre: 'Pan artesanal', categoria: 'Alimentación', provincia: 'Córdoba', materia_prima: 'harina', estado: 'vivo', dificultad: 3, descripcion: 'Elaboración de pan de masa madre.' },
+    { nombre: 'Cerámica de Fajalauza', categoria: 'Cerámica', provincia: 'Granada', materia_prima: 'barro', estado: 'vivo', dificultad: 4, descripcion: 'Cerámica vidriada tradicional granadina.' },
+    { nombre: 'Vidrieras artísticas', categoria: 'Vidrio', provincia: 'Málaga', materia_prima: 'vidrio', estado: 'vivo', dificultad: 4, descripcion: 'Vidrieras emplomadas de colores.' },
+    { nombre: 'Espartería', categoria: 'Fibras vegetales', provincia: 'Almería', materia_prima: 'esparto', estado: 'perdido', dificultad: 3, descripcion: 'Fabricación de cuerdas y calzado de esparto.' }
+  ];
+
+  function createBus() {
+    const listeners = {};
+    return {
+      on(evt, fn) { (listeners[evt] = listeners[evt] || []).push(fn); return () => this.off(evt, fn); },
+      off(evt, fn) { listeners[evt] = (listeners[evt] || []).filter(f => f !== fn); },
+      emit(evt, data) {
+        (listeners[evt] || []).slice().forEach(fn => {
+          try { fn(data); } catch (e) { console.error('[bus]', evt, e); }
+        });
+      }
+    };
+  }
+
+  function interpolate(tpl, ctx) {
+    if (typeof tpl !== 'string') return '';
+    return tpl.replace(/\{\{\s*([\w.-]+)\s*\}\}/g, (_, key) => {
+      const v = ctx[key];
+      return v == null ? '' : String(v);
+    });
+  }
+
+  function applyRule(item, rule) {
+    if (!rule || !rule.campo) return true;
+    const value = item[rule.campo];
+    if (value === undefined || value === null) return false;
+    const target = rule.valor;
+    switch (rule.operador) {
+      case '=':
+      case '==': return value == target;
+      case '===': return value === target;
+      case '>': return value > target;
+      case '<': return value < target;
+      case '>=': return value >= target;
+      case '<=': return value <= target;
+      case 'includes':
+        return Array.isArray(value) ? value.includes(target) : String(value).includes(String(target));
+      case 'in':
+        return Array.isArray(target) && target.includes(value);
+      case 'exists':
+        return true;
+      default:
+        return true;
+    }
+  }
+
+  function applyDeclarativeRules(items, config, userInput, history) {
+    if (!Array.isArray(items)) return [];
+    const dims = (config && config.dimensions) || {};
+    let filtered = items.slice();
+
+    if (dims.goal && dims.goal.rules && userInput.goal) {
+      const rule = dims.goal.rules[userInput.goal];
+      if (rule) filtered = filtered.filter(item => applyRule(item, rule));
+    }
+
+    if (dims.resource && dims.resource.field && userInput.resource !== '' && userInput.resource != null) {
+      const max = Number(userInput.resource);
+      if (!isNaN(max)) {
+        const field = dims.resource.field;
+        filtered = filtered.filter(item => {
+          const v = Number(item[field]);
+          return !isNaN(v) && v <= max;
+        });
+      }
+    }
+
+    if (dims.restrictions && dims.restrictions.field && Array.isArray(userInput.restrictions) && userInput.restrictions.length) {
+      const field = dims.restrictions.field;
+      filtered = filtered.filter(item => {
+        const v = item[field];
+        if (Array.isArray(v)) return userInput.restrictions.every(r => v.includes(r));
+        if (typeof v === 'string') return userInput.restrictions.includes(v);
+        return false;
+      });
+    }
+
+    if (dims.memory === 'last3' && Array.isArray(history) && history.length) {
+      const lastNames = history.slice(-3).map(h => h.nombre).filter(Boolean);
+      if (lastNames.length) {
+        const without = filtered.filter(item => !lastNames.includes(item.nombre));
+        if (without.length > 0) filtered = without;
+      }
+    }
+
+    return filtered;
+  }
+
+  function applyFieldMapping(data, mapping) {
+    if (!mapping || !Object.keys(mapping).length) return data;
+    return data.map(item => {
+      const out = {};
+      for (const [internal, external] of Object.entries(mapping)) {
+        out[internal] = item[external];
+      }
+      return out;
+    });
+  }
+
+  function validateConfig(cfg) {
+    const errors = [];
+    if (!cfg || typeof cfg !== 'object') return ['config no es objeto'];
+    if (!cfg.name) errors.push('name requerido');
+    if (!cfg.purpose) errors.push('purpose requerido');
+    if (!cfg.dataSource || !cfg.dataSource.type) errors.push('dataSource.type requerido');
+    if (!cfg.dimensions) errors.push('dimensions requerido');
+    else {
+      ['goal', 'profile', 'restrictions', 'resource', 'context'].forEach(k => {
+        if (!cfg.dimensions[k]) errors.push('dimensions.' + k + ' requerido');
+      });
+    }
+    return errors;
+  }
+
+  const DataAdapters = {
+    async inline(config) {
+      return Array.isArray(config.data) ? config.data.slice() : [];
+    },
+    async api(config) {
+      const ds = config.dataSource || {};
+      if (!ds.url) throw new Error('URL de API no definida');
+      const headers = ds.apiKey ? { 'Authorization': 'Bearer ' + ds.apiKey } : {};
+      const res = await fetch(ds.url, { headers });
+      if (!res.ok) throw new Error('API error: ' + res.status);
+      let data = await res.json();
+      if (!Array.isArray(data) && data && Array.isArray(data.data)) data = data.data;
+      if (!Array.isArray(data)) throw new Error('La API no devolvió un array');
+      return applyFieldMapping(data, ds.fieldMapping);
+    },
+    async search(config, userInput) {
+      const parts = [];
+      if (userInput.goal) parts.push(userInput.goal);
+      if (Array.isArray(userInput.restrictions) && userInput.restrictions.length) parts.push(userInput.restrictions.join(' '));
+      if (userInput.context) parts.push(userInput.context);
+      const query = parts.join(' ').trim() || config.name || 'oficios';
+      return { redirect: 'https://www.google.com/search?q=' + encodeURIComponent(query), query };
+    }
+  };
+
+  function defaultConfig() {
+    return {
+      version: 4,
+      name: 'Oficios de Andalucía',
+      purpose: 'Descubre oficios tradicionales del Atlas del Patrimonio Inmaterial de Andalucía.',
+      attribution: 'Fuente: Atlas del Patrimonio Inmaterial de Andalucía (CC BY 4.0) — IAPH. Datos de ejemplo.',
+      dataSource: { type: 'inline', url: '', apiKey: '', fieldMapping: {} },
+      data: OFICIOS_ANDALUCIA.slice(),
+      dataSchema: {
+        nombre: 'string', categoria: 'string', provincia: 'string',
+        materia_prima: 'string', estado: 'string', dificultad: 'number', descripcion: 'string'
+      },
+      dimensions: {
+        goal: {
+          question: '¿Qué tipo de oficio te interesa?',
+          options: ['Oficio vivo', 'En riesgo', 'Perdido'],
+          rules: {
+            'Oficio vivo': { campo: 'estado', operador: '=', valor: 'vivo' },
+            'En riesgo': { campo: 'estado', operador: '=', valor: 'en_riesgo' },
+            'Perdido': { campo: 'estado', operador: '=', valor: 'perdido' }
+          }
+        },
+        profile: { question: 'Tu perfil', options: ['Curioso', 'Artesano', 'Estudiante'] },
+        restrictions: {
+          question: 'Materia prima',
+          options: ['barro', 'madera', 'metal', 'esparto', 'cuero', 'textil', 'vidrio', 'yeso', 'aceituna', 'sal', 'carne', 'harina', 'cerámica'],
+          field: 'materia_prima'
+        },
+        resource: { label: 'Dificultad máxima (1-5)', type: 'slider', field: 'dificultad' },
+        context: { question: '¿Dónde lo conociste?', variable: 'lugar' },
+        tone: 'motivador',
+        template: '🧶 <strong>{{nombre}}</strong><br>{{categoria}} · {{provincia}}<br>{{descripcion}}<br><em>{{detalles}}</em><br>📍 {{lugar}}',
+        memory: 'none',
+        action: 'link'
+      }
+    };
+  }
+
+  return {
+    createBus, interpolate, applyRule, applyDeclarativeRules,
+    applyFieldMapping, validateConfig, DataAdapters, defaultConfig,
+    OFICIOS_ANDALUCIA
+  };
+})();
+</script>
+
+<script id="bootScript">
+(function () {
+  'use strict';
+  const E = window.AGENT_ENGINE;
+  const bus = E.createBus();
+  const CONFIG_KEY = 'fabricaAgentes:config:v4';
+  const HISTORY_KEY = 'fabricaAgentes:history:v4';
+  const $ = id => document.getElementById(id);
+
+  const hasInjected = !!window.AGENT_CONFIG;
+  const hasCreator = !!$('creatorPanel');
+  const wantsPlayer = location.hash === '#player';
+  const mode = hasInjected ? 'exported' : (wantsPlayer || !hasCreator ? 'player' : 'editor');
+
+  let config;
+  if (hasInjected) {
+    config = window.AGENT_CONFIG;
+    if (window.AGENT_DATA) {
+      config.data = window.AGENT_DATA;
+      config.dataSource = Object.assign({}, config.dataSource, { type: 'inline' });
+    }
+  } else {
+    try {
+      const raw = localStorage.getItem(CONFIG_KEY);
+      if (raw) config = JSON.parse(raw);
+    } catch (_) { config = null; }
+    if (!config || E.validateConfig(config).length > 0) config = E.defaultConfig();
+  }
+
+  if (mode !== 'editor' && $('creatorPanel')) $('creatorPanel').style.display = 'none';
+
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function getHistory() {
+    try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); }
+    catch (_) { return []; }
+  }
+  function pushHistory(entry) {
+    const h = getHistory();
+    h.push(entry);
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(h.slice(-10)));
+    bus.emit('history:changed', h);
+  }
+  function clearHistory() {
+    localStorage.removeItem(HISTORY_KEY);
+    bus.emit('history:changed', []);
+  }
+  function renderHistory() {
+    const c = $('historyContainer');
+    if (!c) return;
+    const h = getHistory();
+    if (!h.length) { c.innerHTML = '<p class="note">Sin historial.</p>'; return; }
+    c.innerHTML = h.map(e =>
+      '<div class="history-item"><strong>' + esc(e.nombre) + '</strong> · ' + esc(e.fecha) +
+      (e.contexto ? ' · ' + esc(e.contexto) : '') + '</div>'
+    ).join('');
+  }
+  bus.on('history:changed', renderHistory);
+
+  function renderPlayer(cfg) {
+    const tmpl = $('playerTemplate');
+    const cont = $('playerContainer');
+    if (!tmpl || !cont) return;
+    cont.innerHTML = tmpl.innerHTML;
+    $('previewAgentName').textContent = cfg.name;
+    $('previewPurpose').textContent = cfg.purpose;
+    const attrib = $('playerAttribution');
+    if (attrib) attrib.textContent = cfg.attribution || '';
+    renderUserForm(cfg);
+    wirePlayer(cfg);
+    renderHistory();
+  }
+
+  function renderUserForm(cfg) {
+    const d = cfg.dimensions;
+    const form = $('dynamicUserForm');
+    if (!form) return;
+    let html = '';
+
+    html += '<label>' + esc(d.goal.question) + '</label><select id="userGoal">';
+    (d.goal.options || []).forEach(o => { html += '<option value="' + esc(o) + '">' + esc(o) + '</option>'; });
+    html += '</select>';
+
+    html += '<label>' + esc(d.profile.question) + '</label><select id="userProfile">';
+    (d.profile.options || []).forEach(o => { html += '<option value="' + esc(o) + '">' + esc(o) + '</option>'; });
+    html += '</select>';
+
+    html += '<label>' + esc(d.restrictions.question) + '</label><div class="checkbox-row">';
+    (d.restrictions.options || []).forEach(o => {
+      html += '<label class="chk"><input type="checkbox" value="' + esc(o) + '" class="userRestrict">' + esc(o) + '</label>';
+    });
+    html += '</div>';
+
+    html += '<label>' + esc(d.resource.label) + '</label>';
+    if (d.resource.type === 'slider') {
+      html += '<input type="range" id="userResource" min="1" max="5" value="5" step="1">';
+    } else {
+      html += '<input type="number" id="userResource" value="5">';
+    }
+
+    html += '<label>' + esc(d.context.question) + '</label><input type="text" id="userContext" placeholder="...">';
+
+    form.innerHTML = html;
+  }
+
+  function wirePlayer(cfg) {
+    const run = $('runAgentBtn');
+    if (run) run.addEventListener('click', () => executeAgent(cfg));
+    const clr = $('clearHistoryBtn');
+    if (clr) clr.addEventListener('click', () => { clearHistory(); renderHistory(); });
+  }
+
+  async function executeAgent(cfg) {
+    const out = $('agentOutput');
+    if (!out) return;
+    const d = cfg.dimensions;
+    const userInput = {
+      goal: ($('userGoal') || {}).value || '',
+      profile: ($('userProfile') || {}).value || '',
+      restrictions: Array.from(document.querySelectorAll('.userRestrict:checked')).map(c => c.value),
+      resource: ($('userResource') || {}).value || '',
+      context: ($('userContext') || {}).value || ''
+    };
+    bus.emit('agent:executing', userInput);
+    out.innerHTML = '⏳ Cargando…';
+
+    try {
+      const type = cfg.dataSource.type;
+
+      if (type === 'search') {
+        const r = await E.DataAdapters.search(cfg, userInput);
+        out.innerHTML = '🔍 <strong>Búsqueda:</strong> "' + esc(r.query) +
+          '"<br><a href="' + esc(r.redirect) + '" target="_blank" rel="noopener">Ver en Google</a>';
+        bus.emit('agent:executed', { redirect: r.redirect });
+        return;
+      }
+
+      const items = await E.DataAdapters[type](cfg);
+      const history = getHistory();
+      let filtered = E.applyDeclarativeRules(items, cfg, userInput, history);
+
+      if (!filtered.length) {
+        out.innerHTML = '😕 No hay resultados. Prueba a relajar los filtros.';
+        bus.emit('agent:error', { reason: 'no_results' });
+        return;
+      }
+
+      const selected = filtered[0];
+      const detalles = buildDetails(selected);
+      const ctx = Object.assign({}, selected, {
+        detalles,
+        [d.context.variable]: userInput.context || '_________'
+      });
+      let html = E.interpolate(d.template, ctx);
+
+      if (d.action === 'link') {
+        html += '<br><a href="https://www.google.com/search?q=' +
+          encodeURIComponent(selected.nombre || '') + '" target="_blank" rel="noopener">🔗 Más información</a>';
+      }
+
+      out.innerHTML = html;
+      pushHistory({ nombre: selected.nombre, fecha: new Date().toLocaleString(), contexto: userInput.context });
+      bus.emit('agent:executed', selected);
+    } catch (e) {
+      out.innerHTML = '❌ Error: ' + esc(e.message);
+      bus.emit('agent:error', { error: e });
+    }
+  }
+
+  function buildDetails(item) {
+    if (item.dificultad != null) return 'Dificultad ' + item.dificultad + '/5 · Estado: ' + (item.estado || '—');
+    if (item.kcal != null) return item.kcal + ' kcal, ' + (item.proteina || 0) + 'g prot';
+    if (item.tiempo != null) return item.tiempo + ' min';
+    return '';
+  }
+
+  function populateFormFromConfig(cfg) {
+    const set = (id, v) => { const el = $(id); if (el != null) el.value = v; };
+    set('agentName', cfg.name);
+    set('agentPurpose', cfg.purpose);
+    set('agentAttribution', cfg.attribution || '');
+    set('dataSourceType', cfg.dataSource.type);
+    set('apiUrl', cfg.dataSource.url || '');
+    set('apiKey', cfg.dataSource.apiKey || '');
+    set('fieldMapping', JSON.stringify(cfg.dataSource.fieldMapping || {}, null, 2));
+    set('agentData', JSON.stringify(cfg.data || [], null, 2));
+    set('dataSchema', JSON.stringify(cfg.dataSchema || {}, null, 2));
+
+    const d = cfg.dimensions;
+    set('dimGoalQ', d.goal.question);
+    set('dimGoalOpts', (d.goal.options || []).join(', '));
+    set('dimGoalRules', JSON.stringify(d.goal.rules || {}, null, 2));
+    set('dimProfileQ', d.profile.question);
+    set('dimProfileOpts', (d.profile.options || []).join(', '));
+    set('dimRestrictQ', d.restrictions.question);
+    set('dimRestrictOpts', (d.restrictions.options || []).join(', '));
+    set('dimRestrictField', d.restrictions.field);
+    set('dimResourceLabel', d.resource.label);
+    set('dimResourceType', d.resource.type);
+    set('dimResourceField', d.resource.field);
+    set('dimContextQ', d.context.question);
+    set('dimContextVar', d.context.variable);
+    set('dimTone', d.tone);
+    set('dimTemplate', d.template);
+    set('dimMemory', d.memory);
+    set('dimAction', d.action);
+
+    const api = $('apiConfigPanel');
+    if (api) api.style.display = cfg.dataSource.type === 'api' ? 'block' : 'none';
+  }
+
+  function collectConfigFromForm() {
+    const errors = [];
+    const safeJson = (id, fallback) => {
+      const el = $(id);
+      const raw = el ? el.value : '';
+      if (!raw || !raw.trim()) return fallback;
+      try { return JSON.parse(raw); }
+      catch (e) { errors.push(id + ': ' + e.message); return fallback; }
+    };
+    const val = id => (($(id) || {}).value || '');
+    const csv = id => val(id).split(',').map(s => s.trim()).filter(Boolean);
+
+    const cfg = {
+      version: 4,
+      name: val('agentName') || 'Agente',
+      purpose: val('agentPurpose') || '',
+      attribution: val('agentAttribution') || '',
+      dataSource: {
+        type: val('dataSourceType') || 'inline',
+        url: val('apiUrl'),
+        apiKey: val('apiKey'),
+        fieldMapping: safeJson('fieldMapping', {})
+      },
+      data: safeJson('agentData', []),
+      dataSchema: safeJson('dataSchema', {}),
+      dimensions: {
+        goal: { question: val('dimGoalQ'), options: csv('dimGoalOpts'), rules: safeJson('dimGoalRules', {}) },
+        profile: { question: val('dimProfileQ'), options: csv('dimProfileOpts') },
+        restrictions: { question: val('dimRestrictQ'), options: csv('dimRestrictOpts'), field: val('dimRestrictField') },
+        resource: { label: val('dimResourceLabel'), type: val('dimResourceType') || 'number', field: val('dimResourceField') },
+        context: { question: val('dimContextQ'), variable: val('dimContextVar') },
+        tone: val('dimTone') || 'motivador',
+        template: val('dimTemplate') || '{{nombre}}',
+        memory: val('dimMemory') || 'none',
+        action: val('dimAction') || 'show'
+      }
+    };
+
+    if (errors.length) throw new Error('JSON inválido en: ' + errors.join('; '));
+    return cfg;
+  }
+
+  function applyConfig(cfg) {
+    const errors = E.validateConfig(cfg);
+    if (errors.length) { alert('Config inválida:\n' + errors.join('\n')); return; }
+    config = cfg;
+    if (mode === 'editor') localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
+    bus.emit('config:updated', cfg);
+    renderPlayer(cfg);
+  }
+
+  function safeJsonStringify(obj) {
+    return JSON.stringify(obj).replace(/<\//g, '<\\/');
+  }
+
+  function b64e(str) {
+    if (typeof TextEncoder !== 'undefined') {
+      const bytes = new TextEncoder().encode(str);
+      let bin = '';
+      for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+      return btoa(bin);
+    }
+    return btoa(unescape(encodeURIComponent(str)));
+  }
+
+  function exportAgent() {
+    let cfg;
+    try { cfg = collectConfigFromForm(); }
+    catch (e) { alert('No se puede exportar: ' + e.message); return; }
+    const errors = E.validateConfig(cfg);
+    if (errors.length) { alert('Config inválida:\n' + errors.join('\n')); return; }
+
+    const styleEl  = $('appStyles');
+    const engineEl = $('engineScript');
+    const bootEl   = $('bootScript');
+    const tmplEl   = $('playerTemplate');
+    if (!styleEl || !engineEl || !bootEl || !tmplEl) { alert('Recursos internos no encontrados'); return; }
+
+    const styles    = styleEl.textContent;
+    const engineSrc = engineEl.textContent;
+    const bootSrc   = bootEl.textContent;
+    const tmplHtml  = tmplEl.innerHTML;
+    const attrib    = cfg.attribution || '';
+
+    const engineB64  = b64e(engineSrc);
+    const bootB64    = b64e(bootSrc);
+    const configJson = safeJsonStringify(cfg);
+    const dataJson   = safeJsonStringify(cfg.data || []);
+
+    const loader = [
+      '(function(){',
+      '  function b64d(s){',
+      '    if(typeof TextDecoder!=="undefined"){',
+      '      var bin=atob(s),len=bin.length,bytes=new Uint8Array(len);',
+      '      for(var i=0;i<len;i++)bytes[i]=bin.charCodeAt(i);',
+      '      return new TextDecoder().decode(bytes);',
+      '    }',
+      '    return decodeURIComponent(Array.prototype.map.call(atob(s),function(c){',
+      '      return "%"+("00"+c.charCodeAt(0).toString(16)).slice(-2);',
+      '    }).join(""));',
+      '  }',
+      '  try {',
+      '    var e=document.createElement("script");',
+      '    e.textContent=b64d(document.getElementById("engineB64").textContent);',
+      '    document.head.appendChild(e);',
+      '    var b=document.createElement("script");',
+      '    b.textContent=b64d(document.getElementById("bootB64").textContent);',
+      '    document.head.appendChild(b);',
+      '  } catch(err) {',
+      '    document.body.insertAdjacentHTML("beforeend",',
+      '      "<pre style=\\"color:#b91c1c;padding:16px\\">Error: "+err.message+"</pre>");',
+      '  }',
+      '})();'
+    ].join('\n');
+
+    const C60 = String.fromCharCode(60);
+    const C62 = String.fromCharCode(62);
+    const C47 = String.fromCharCode(47);
+    const OPEN_SCRIPT  = C60 + 'script' + C62;
+    const CLOSE_SCRIPT = C60 + C47 + 'script' + C62;
+
+    const html = [
+      '<!DOCTYPE html>',
+      '<html lang="es">',
+      '<head>',
+      '<meta charset="UTF-8">',
+      '<meta name="viewport" content="width=device-width,initial-scale=1">',
+      '<meta name="generator" content="Fábrica de Agentes v4">',
+      '<meta name="license" content="AGPL-3.0-or-later">',
+      '<meta name="data-attribution" content="' + esc(attrib) + '">',
+      '<title>' + esc(cfg.name) + '</title>',
+      '<style>' + styles + '</style>',
+      '</head>',
+      '<body>',
+      '<div class="app">',
+      '<template id="playerTemplate">' + tmplHtml + '</template>',
+      '<div id="playerContainer"></div>',
+      '</div>',
+      OPEN_SCRIPT + 'window.AGENT_CONFIG = ' + configJson + ';window.AGENT_DATA = ' + dataJson + ';' + CLOSE_SCRIPT,
+      C60 + 'script type="text/plain" id="engineB64"' + C62 + engineB64 + CLOSE_SCRIPT,
+      C60 + 'script type="text/plain" id="bootB64"'   + C62 + bootB64   + CLOSE_SCRIPT,
+      OPEN_SCRIPT + loader + CLOSE_SCRIPT,
+      '</body>',
+      '</html>'
+    ].join('\n');
+
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = (cfg.name || 'agente').replace(/[^\w\-]+/g, '_') + '.html';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function wireEditor() {
+    const apply = $('applyConfigBtn');
+    if (apply) apply.addEventListener('click', () => {
+      try { applyConfig(collectConfigFromForm()); }
+      catch (e) { alert(e.message); }
+    });
+
+    const exp = $('exportAgentBtn');
+    if (exp) exp.addEventListener('click', exportAgent);
+
+    const ds = $('dataSourceType');
+    if (ds) ds.addEventListener('change', () => {
+      const p = $('apiConfigPanel');
+      if (p) p.style.display = ds.value === 'api' ? 'block' : 'none';
+    });
+
+    const prev = $('previewDataBtn');
+    if (prev) prev.addEventListener('click', () => {
+      const box = $('dataPreview');
+      if (!box) return;
+      try {
+        const data = JSON.parse(($('agentData') || {}).value || '[]');
+        box.innerHTML = '<strong>Primeros 3:</strong><pre>' +
+          esc(JSON.stringify(data.slice(0, 3), null, 2)) + '</pre>';
+      } catch (e) { box.textContent = 'JSON inválido: ' + e.message; }
+    });
+
+    const infer = $('inferSchemaBtn');
+    if (infer) infer.addEventListener('click', () => {
+      try {
+        const data = JSON.parse(($('agentData') || {}).value || '[]');
+        if (!Array.isArray(data) || !data.length) { alert('Necesito al menos un ítem'); return; }
+        const schema = {};
+        Object.keys(data[0]).forEach(k => {
+          const v = data[0][k];
+          schema[k] = Array.isArray(v) ? 'array' : typeof v;
+        });
+        const ta = $('dataSchema');
+        if (ta) ta.value = JSON.stringify(schema, null, 2);
+      } catch (e) { alert('JSON inválido: ' + e.message); }
+    });
+
+    const modal = $('readmeModal');
+    const openM = $('showReadmeBtn');
+    const closeM = $('closeModalBtn');
+    if (openM && modal) openM.addEventListener('click', () => modal.style.display = 'flex');
+    if (closeM && modal) closeM.addEventListener('click', () => modal.style.display = 'none');
+    if (modal) modal.addEventListener('click', e => { if (e.target === modal) modal.style.display = 'none'; });
+  }
+
+  if (mode === 'editor') {
+    populateFormFromConfig(config);
+    wireEditor();
+  }
+  renderPlayer(config);
+})();
+</script>
+
+<script id="testScript">
+(function () {
+  'use strict';
+  const box = document.getElementById('testResults');
+  if (!box) return;
+
+  const E = window.AGENT_ENGINE;
+  function assert(cond, msg) { if (!cond) throw new Error(msg || 'assert falló'); }
+
+  const TESTS = [
+    ['applyRule: = igualdad', () => {
+      assert(E.applyRule({ categoria: 'light' }, { campo: 'categoria', operador: '=', valor: 'light' }) === true);
+      assert(E.applyRule({ categoria: 'light' }, { campo: 'categoria', operador: '=', valor: 'otro' }) === false);
+    }],
+    ['applyRule: campo ausente no matchea', () => {
+      assert(E.applyRule({}, { campo: 'x', operador: '=', valor: 1 }) === false);
+    }],
+    ['applyRule: operador desconocido no filtra', () => {
+      assert(E.applyRule({ a: 1 }, { campo: 'a', operador: '???', valor: 99 }) === true);
+    }],
+    ['applyRule: comparadores', () => {
+      const it = { n: 5 };
+      assert(E.applyRule(it, { campo: 'n', operador: '>', valor: 3 }));
+      assert(E.applyRule(it, { campo: 'n', operador: '<', valor: 10 }));
+      assert(E.applyRule(it, { campo: 'n', operador: '>=', valor: 5 }));
+      assert(E.applyRule(it, { campo: 'n', operador: '<=', valor: 5 }));
+    }],
+    ['applyRule: includes en array y string', () => {
+      assert(E.applyRule({ r: ['Vegano', 'Sin gluten'] }, { campo: 'r', operador: 'includes', valor: 'Vegano' }));
+      assert(E.applyRule({ s: 'hola mundo' }, { campo: 's', operador: 'includes', valor: 'mundo' }));
+    }],
+    ['applyDeclarativeRules: filtro por goal', () => {
+      const items = [{ c: 'a' }, { c: 'b' }, { c: 'a' }];
+      const cfg = { dimensions: { goal: { rules: { X: { campo: 'c', operador: '=', valor: 'a' } } } } };
+      assert(E.applyDeclarativeRules(items, cfg, { goal: 'X' }, []).length === 2);
+    }],
+    ['applyDeclarativeRules: recurso excluye mayores', () => {
+      const items = [{ t: 5 }, { t: 10 }, { t: 20 }];
+      const cfg = { dimensions: { resource: { field: 't' } } };
+      assert(E.applyDeclarativeRules(items, cfg, { resource: 10 }, []).length === 2);
+    }],
+    ['applyDeclarativeRules: recurso no numérico se ignora', () => {
+      const items = [{ t: 5 }];
+      const cfg = { dimensions: { resource: { field: 't' } } };
+      assert(E.applyDeclarativeRules(items, cfg, { resource: 'abc' }, []).length === 1);
+    }],
+    ['applyDeclarativeRules: restricciones por ítem', () => {
+      const items = [
+        { restricciones: ['Vegano'] },
+        { restricciones: ['Sin gluten'] },
+        { restricciones: ['Vegano', 'Sin gluten'] },
+        {}
+      ];
+      const cfg = { dimensions: { restrictions: { field: 'restricciones' } } };
+      assert(E.applyDeclarativeRules(items, cfg, { restrictions: ['Vegano'] }, []).length === 2);
+    }],
+    ['applyDeclarativeRules: restricciones string OR', () => {
+      const items = [{ m: 'barro' }, { m: 'metal' }, { m: 'madera' }];
+      const cfg = { dimensions: { restrictions: { field: 'm' } } };
+      assert(E.applyDeclarativeRules(items, cfg, { restrictions: ['barro', 'metal'] }, []).length === 2);
+    }],
+    ['applyDeclarativeRules: last3 excluye últimos', () => {
+      const items = [{ nombre: 'A' }, { nombre: 'B' }, { nombre: 'C' }, { nombre: 'D' }];
+      const cfg = { dimensions: { memory: 'last3' } };
+      const h = [{ nombre: 'A' }, { nombre: 'B' }, { nombre: 'C' }];
+      const out = E.applyDeclarativeRules(items, cfg, {}, h);
+      assert(out.length === 1 && out[0].nombre === 'D');
+    }],
+    ['applyDeclarativeRules: last3 fallback si todos en historial', () => {
+      const items = [{ nombre: 'A' }, { nombre: 'B' }];
+      const cfg = { dimensions: { memory: 'last3' } };
+      const h = [{ nombre: 'A' }, { nombre: 'B' }];
+      assert(E.applyDeclarativeRules(items, cfg, {}, h).length === 2);
+    }],
+    ['applyFieldMapping: mapea', () => {
+      const out = E.applyFieldMapping([{ title: 'X', calories: 100 }], { nombre: 'title', kcal: 'calories' });
+      assert(out[0].nombre === 'X' && out[0].kcal === 100);
+    }],
+    ['applyFieldMapping: sin mapping no toca', () => {
+      const d = [{ a: 1 }];
+      assert(E.applyFieldMapping(d, {}) === d);
+    }],
+    ['interpolate: reemplaza y deja vacío lo ausente', () => {
+      assert(E.interpolate('Hola {{nombre}}, {{falta}}!', { nombre: 'X' }) === 'Hola X, !');
+    }],
+    ['validateConfig: detecta faltantes', () => {
+      assert(E.validateConfig({}).length > 0);
+    }],
+    ['validateConfig: defaultConfig es válida', () => {
+      const errs = E.validateConfig(E.defaultConfig());
+      assert(errs.length === 0, 'defaultConfig inválida: ' + errs.join(','));
+    }],
+    ['search adapter: usa goal directo', async () => {
+      const out = await E.DataAdapters.search({ name: 'X' }, { goal: 'algo', restrictions: [], context: '' });
+      assert(out.redirect.indexOf('algo') !== -1);
+    }]
+  ];
+
+  (async () => {
+    let ok = 0, ko = 0;
+    const lines = [];
+    for (const [name, fn] of TESTS) {
+      try { await fn(); ok++; lines.push('<div class="test-ok">✓ ' + name + '</div>'); }
+      catch (e) { ko++; lines.push('<div class="test-ko">✗ ' + name + ' — ' + e.message + '</div>'); }
+    }
+    const summary = '<p style="margin-bottom:8px;"><strong>🧪 Tests del motor:</strong> ' +
+      '<span class="test-ok">' + ok + ' OK</span>' +
+      (ko ? ' · <span class="test-ko">' + ko + ' fallos</span>' : '') + '</p>';
+    box.innerHTML = summary + lines.join('');
+    console.log('[tests]', ok + ' OK, ' + ko + ' KO');
+  })();
+})();
+</script>
+</body>
+</html>
