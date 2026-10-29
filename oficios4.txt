@@ -1,0 +1,323 @@
+================================================================================
+  FÁBRICA DE AGENTES v4 · OFICIOS DE ANDALUCÍA
+  Documentación del proyecto
+================================================================================
+
+Autor del código: AGPL-3.0-or-later
+Datos de ejemplo: CC BY 4.0 — Atlas del Patrimonio Inmaterial de Andalucía (IAPH)
+Versión: 4.0
+Formato: single-file HTML (todo en un archivo, sin dependencias externas)
+
+
+================================================================================
+1. QUÉ ES
+================================================================================
+
+Una fábrica de agentes conversacionales declarativos. En lugar de programar un
+agente desde cero, tú describes con formularios y JSON:
+
+  - Qué datos usa.
+  - Qué preguntas hace al usuario.
+  - Qué reglas filtran esos datos.
+  - Cómo se presenta el resultado.
+
+El programa genera un "agente" (configuración) y puede EXPORTARLO como un único
+archivo HTML autónomo. Ese HTML se abre con doble clic, funciona sin internet,
+sin servidor, sin instalar nada, y se puede compartir por correo, WhatsApp o USB.
+
+El caso de demostración es un agente que recomienda oficios tradicionales de
+Andalucía, pero la arquitectura sirve para cualquier catálogo filtrable:
+recetas, libros, películas, productos, rutas, etc.
+
+
+================================================================================
+2. QUÉ HACE
+================================================================================
+
+2.1. MODO EDITOR (index.html abierto normal)
+
+  - Configuras el nombre, propósito y atribución del agente.
+  - Pegas o editas los datos en JSON.
+  - Defines las "dimensiones" del usuario:
+      * Objetivo (con reglas declarativas por opción).
+      * Perfil del usuario.
+      * Restricciones (checkbox múltiple).
+      * Recurso limitante (número o slider).
+      * Contexto libre (texto).
+  - Eliges una plantilla de salida HTML con variables tipo {{nombre}}.
+  - Eliges memoria (recordar o no repetir últimas 3 recomendaciones).
+  - Eliges acción (solo mostrar o añadir enlace externo).
+
+2.2. VISTA PREVIA EN VIVO
+
+  Al pulsar "Aplicar configuración" se renderiza el player debajo del editor.
+  Es exactamente el mismo código que irá al HTML exportado, así que lo que ves
+  es lo que se lleva el usuario final.
+
+2.3. EXPORTACIÓN A HTML AUTÓNOMO
+
+  Pulsando "Exportar player como HTML" se descarga un único archivo .html con:
+
+  - El motor completo embebido (reglas, adaptadores, render).
+  - La configuración actual congelada.
+  - Los datos embebidos dentro del archivo.
+  - Los estilos.
+  - Sin referencias externas (ni CDN, ni fuentes, ni APIs).
+
+  Ese archivo se abre offline y funciona igual que la vista previa.
+
+2.4. HISTORIAL Y MEMORIA
+
+  El player guarda las últimas 10 ejecuciones en localStorage. Si activas la
+  memoria "no repetir últimos 3", el motor evita recomendar lo mismo tres veces
+  seguidas. Si se agota el catálogo, hace fallback al set anterior en lugar de
+  devolver "no hay resultados".
+
+2.5. TESTS INTEGRADOS
+
+  El editor incluye 18 tests unitarios del motor (reglas, adaptadores, mapeo,
+  interpolación, validación). Se ejecutan al cargar y muestran su estado en
+  el panel inferior. Si algo se rompe, lo ves en rojo.
+
+
+================================================================================
+3. CÓMO LO HACE (ARQUITECTURA)
+================================================================================
+
+El código está dividido en tres bloques independientes dentro del mismo
+archivo HTML. Cada bloque tiene una responsabilidad clara.
+
+  +----------------+------------------------------------------+
+  |  BLOQUE        |  RESPONSABILIDAD                         |
+  +----------------+------------------------------------------+
+  |  engineScript  |  Lógica pura: reglas, adaptadores,       |
+  |                |  validación, interpolación. Sin DOM,     |
+  |                |  sin localStorage. 100% testeable.       |
+  +----------------+------------------------------------------+
+  |  bootScript    |  Orquesta los 3 modos (editor, player,   |
+  |                |  exportado). Renderiza el player, maneja |
+  |                |  eventos, historial, exportación.        |
+  +----------------+------------------------------------------+
+  |  testScript    |  Batería de tests. Solo corre si existe  |
+  |                |  #testResults (modo editor). No se       |
+  |                |  incluye en el HTML exportado.           |
+  +----------------+------------------------------------------+
+
+3.1. MOTOR DECLARATIVO (engineScript)
+
+  El corazón del sistema es la función applyDeclarativeRules(items, config,
+  userInput, history). Recibe la lista de ítems, la configuración, lo que el
+  usuario eligió y el historial, y devuelve la lista filtrada.
+
+  Orden de filtrado:
+    1) Regla de objetivo → si la opción tiene regla {campo, operador, valor}.
+    2) Recurso limitante → descarta ítems con campo numérico > máximo.
+    3) Restricciones → por ítem:
+         - Si el campo es array: coincidencia de TODAS (AND).
+         - Si el campo es string: coincidencia de UNA (OR).
+    4) Memoria last3 → excluye los últimos 3 nombres del historial, con
+       fallback al set anterior si quedan 0 resultados.
+
+  La función es PURA: no toca el DOM ni localStorage. Esto permite testearla
+  en aislamiento con fixtures sintéticos. El historial se pasa como argumento.
+
+3.2. ADAPTADORES DE DATOS
+
+  Tres adaptadores con contrato unificado:
+
+    inline:  devuelve config.data tal cual (datos embebidos).
+    api:     hace fetch(config.dataSource.url), aplica fieldMapping y
+             normaliza la respuesta (acepta [..] o {data: [..]}).
+    search:  no devuelve ítems, devuelve { redirect, query } para abrir
+             Google en una pestaña nueva.
+
+  Todos los adaptadores devuelven una Promise. El player ramifica una sola
+  vez: si el adaptador es "search", redirige; si no, filtra y renderiza.
+
+3.3. PLANTILLAS DE SALIDA
+
+  Sustitución de variables con interpolate(tpl, ctx). No usa Handlebars: un
+  regex de 3 líneas reemplaza {{var}} por ctx[var]. Esto elimina 90 KB de
+  dependencia y funciona igual para el subconjunto que necesitamos.
+
+  Variables disponibles en la plantilla:
+    {{nombre}}, {{categoria}}, {{provincia}}, {{descripcion}}, {{detalles}},
+    {{dificultad}}, {{estado}} y cualquier variable de contexto del usuario
+    (por ejemplo {{lugar}}).
+
+3.4. TRES MODOS DE EJECUCIÓN
+
+  El bootScript detecta al arrancar en qué modo está:
+
+    EDITOR    → existe #creatorPanel y no hay #player en la URL.
+                Se ve el panel de configuración + vista previa del player.
+                Config e historial en localStorage.
+
+    PLAYER    → URL con #player, o el #creatorPanel no existe.
+                Solo se ve el player. Útil para demo.
+
+    EXPORTADO → existe window.AGENT_CONFIG (inyectado por el export).
+                El player arranca con la config congelada. Ignora localStorage
+                para la config (sí lo usa para el historial).
+
+3.5. EVENT BUS
+
+  Un mini bus de eventos desacopla UI y lógica:
+
+    config:updated    → cuando se aplica una nueva configuración.
+    agent:executing   → al empezar una ejecución.
+    agent:executed    → al terminar con éxito.
+    agent:error       → si hay error o no hay resultados.
+    history:changed   → cuando el historial cambia (render reactivo).
+
+  No es imprescindible, pero evita acoplar el render del historial a cada
+  punto que lo modifica. Es 10 líneas y mejora la mantenibilidad.
+
+3.6. EXPORTACIÓN A PRUEBA DE BALAS
+
+  El HTML final se construye por concatenación de strings (NUNCA
+  serializeToString sobre el DOM, que escapa scripts y los rompe).
+
+  Para evitar que el parser HTML del navegador cierre los <script> antes de
+  tiempo, se aplican tres reglas:
+
+    1) El motor y el boot se codifican en BASE64. Base64 no contiene "<" ni
+       ">", así que es imposible que rompan el script que los contiene.
+
+    2) Las etiquetas <script> y </script> del HTML generado se construyen
+       con String.fromCharCode(60) y String.fromCharCode(47) para que el
+       FUENTE del bootScript no contenga la secuencia peligrosa.
+
+    3) La config y los datos van JSON-escapados: "</" se convierte en "<\/".
+
+  Un loader de ~25 líneas dentro del HTML exportado decodifica el base64 y
+  reinyecta los scripts reales en runtime. Si algo fallara, pinta un <pre>
+  rojo con el mensaje exacto.
+
+
+================================================================================
+4. CÓMO SE USA
+================================================================================
+
+4.1. ABRIR EL EDITOR
+
+  Doble clic en el archivo .html. Se abre el editor en el navegador.
+  Los 18 tests se ejecutan solos y se muestran abajo.
+
+4.2. CONFIGURAR
+
+  1) Nombre, propósito y atribución.
+  2) Pegar los datos en el textarea "Datos del agente" (JSON array).
+     Botón "Vista previa (3 ítems)" para confirmar que el JSON es válido.
+     Botón "Inferir esquema" para generar automáticamente el contrato.
+  3) Ajustar dimensiones (objetivo, perfil, restricciones, recurso,
+     contexto, plantilla).
+  4) Elegir memoria y acción.
+  5) Pulsar "Aplicar configuración".
+
+4.3. PROBAR
+
+  Bajo el editor aparece el player. Elige opciones, pulsa "Ejecutar Agente"
+  y comprueba el resultado. El historial se va llenando.
+
+4.4. EXPORTAR
+
+  Pulsa "Exportar player como HTML". Se descarga un archivo con el nombre
+  del agente. Ábrelo con doble clic. Funciona sin red y sin instalar nada.
+
+4.5. COMPARTIR
+
+  El HTML exportado se puede enviar por correo, WhatsApp, USB o subir a
+  cualquier hosting estático (GitHub Pages, Netlify, etc.). Pesa
+  aproximadamente 100-200 KB (depende del tamaño de los datos embebidos).
+
+
+================================================================================
+5. DATOS: CÓMO CARGAR LOS REALES DE ANDALUCÍA
+================================================================================
+
+Los 20 oficios que vienen por defecto son ILUSTRATIVOS. Para usar el dataset
+completo:
+
+  1) Ve al portal del IAPH:
+     https://www.juntadeandalucia.es/cultura/atlaspatrimonioinmaterial/
+
+  2) Descarga el listado de bienes inmateriales de la categoría "Oficios y
+     saberes" (formato CSV o JSON, según el portal).
+
+  3) Si viene en CSV, conviértelo a JSON con cualquier herramienta online
+     o con un script de 5 líneas.
+
+  4) Pega el JSON en "Datos del agente".
+
+  5) Pulsa "Inferir esquema" para detectar los campos.
+
+  6) Ajusta las dimensiones para que apunten a los campos reales
+     (por ejemplo, si el campo es "provincia", ponlo en las restricciones).
+
+  7) Aplicar → Exportar.
+
+Licencia: el Atlas del Patrimonio Inmaterial de Andalucía se publica bajo
+CC BY 4.0. Puedes reutilizarlo, adaptarlo y distribuirlo SIEMPRE que
+mantengas la atribución. El campo "Atribución de datos" del editor viaja en
+el footer del player y en el <meta> del HTML exportado, así que la obligación
+de atribuir se cumple automáticamente.
+
+
+================================================================================
+6. LICENCIAS
+================================================================================
+
+  Código:  AGPL-3.0-or-later
+           Puedes usarlo, modificarlo y redistribuirlo. Si distribuyes una
+           versión modificada, también debe ser AGPL.
+
+  Datos:   CC BY 4.0 (Atlas del Patrimonio Inmaterial de Andalucía, IAPH)
+           Reutilización libre con atribución. Compatible con AGPL.
+
+  Los 20 oficios de muestra son de creación propia del proyecto, sin
+  restricción adicional.
+
+
+================================================================================
+7. LIMITACIONES CONOCIDAS
+================================================================================
+
+  - La plantilla de salida acepta HTML. Si el player se va a exponer en un
+    contexto no confiable, conviene sanitizar el HTML de salida (por ejemplo
+    con DOMPurify) o restringirlo a una lista blanca de etiquetas. En uso
+    personal no es necesario.
+
+  - El adaptador "api" no valida los datos contra el dataSchema. Confía en
+    que la API devuelve la forma esperada. Si necesitas validación estricta,
+    añade un validador de JSON Schema.
+
+  - El historial usa localStorage, así que es por navegador y por origen.
+    Si compartes el HTML exportado, cada receptor tiene su propio historial.
+
+  - El export es estático: la config y los datos se congelan en el momento
+    de exportar. Si cambias los datos, debes re-exportar.
+
+
+================================================================================
+8. ESTRUCTURA DEL ARCHIVO
+================================================================================
+
+  <head>
+    <style id="appStyles">        → estilos (se reutilizan en el export)
+  </head>
+  <body>
+    <header>                      → título y botón README
+    <div id="creatorPanel">       → editor (solo visible en modo editor)
+    <div id="playerContainer">    → player (se renderiza desde template)
+    <template id="playerTemplate">→ markup del player (única fuente de verdad)
+    <div id="readmeModal">        → modal README
+    <script id="engineScript">    → motor puro (reglas, adaptadores, etc.)
+    <script id="bootScript">      → orquestación de modos + export
+    <script id="testScript">      → 18 tests unitarios
+  </body>
+
+
+================================================================================
+FIN DE LA DOCUMENTACIÓN
+================================================================================
